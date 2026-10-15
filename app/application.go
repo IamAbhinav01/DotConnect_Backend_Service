@@ -1,9 +1,10 @@
 package app
 
 import (
+	"DotConnect/config"
 	"fmt"
 	"net/http"
-	"os"
+	"strings"
 	"time"
 )
 
@@ -13,19 +14,25 @@ type Application struct {
 
 func NewApplication() *Application {
 	return &Application{
-		PORT: os.Getenv("PORT"),
+		PORT: config.GetString("PORT"),
 	}
 }
 
 func (app *Application) Run() error{
 	
+	port := app.PORT
+	if(!strings.HasPrefix(port,":")){
+		port = ":"+port
+	}
+
+
 	server:= http.Server{
-		Addr: ":4000",
+		Addr: port,
 		Handler:  http.DefaultServeMux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 	
-	fmt.Println("Server started on port : ",4000)
+	fmt.Println("Server started on port ",port)
 	return server.ListenAndServe()
 }
