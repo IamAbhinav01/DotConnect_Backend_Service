@@ -33,7 +33,7 @@ func ConnectToDB() error{
 
 	err = mongoClient.Ping(context.Background(),nil)
 	if err != nil{
-		return fmt.Errorf("Error occured while pinging to the database")
+		return fmt.Errorf("Error occured while pinging to the database: %w",err)
 	}
 
 	Database := mongoClient.Database(DB_NAME)

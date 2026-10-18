@@ -20,12 +20,20 @@ func NewApplication() *Application {
 
 func (app *Application) Run() error{
 	
+
+	err := config.ConnectToDB()
+	if err != nil{
+		return  fmt.Errorf("Unable to establish connection to the database %v",err)
+	}
+
+	fmt.Println("Succesfully connected to the database")
+
 	port := app.PORT
 	if(!strings.HasPrefix(port,":")){
 		port = ":"+port
 	}
 
-	
+
 
 	server:= http.Server{
 		Addr: port,
