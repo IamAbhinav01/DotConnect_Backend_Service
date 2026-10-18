@@ -25,6 +25,7 @@ func (app *Application) Run() error{
 		port = ":"+port
 	}
 
+	
 
 	server:= http.Server{
 		Addr: port,
