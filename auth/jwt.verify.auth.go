@@ -7,20 +7,30 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var JWT_SECRET = config.GetString("JWT_SECRET")
+var internalSecret = []byte(config.GetString("INTERNAL_SECRET"))
 
-func VerifyJWTToken(token string) (*jwt.Token, error){
-	jwt_token,err := jwt.Parse(token,func(token *jwt.Token) (interface{}, error){
-		return JWT_SECRET,nil
+type Claims struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+func VerifyIdentityToken(tokenStr string) (*Claims, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return internalSecret, nil
 	})
 
-	if err != nil{
-		return  nil,fmt.Errorf("Error occured while jwt token")
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid or expired identity token")
 	}
 
-	if !jwt_token.Valid{
-		return nil,fmt.Errorf("Invalid token recieved")
+	if claims.Issuer != "api-gateway" || claims.Audience[0] != "dotconnect-go-service" {
+		return nil, fmt.Errorf("token audience/issuer mismatch")
 	}
 
-	return jwt_token,nil
+	return claims, nil
 }
