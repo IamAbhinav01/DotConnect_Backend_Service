@@ -3,51 +3,33 @@ package middlewares
 import (
 	"DotConnect/auth"
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type contextKey string
-const userIDKey contextKey = "userID"
+const (
+	UserIDKey contextKey = "userID"
+	RoleKey   contextKey = "role"
+)
 
-func Auth_Handler(next http.Handler) http.Handler{
+func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := strings.Split( r.Header.Get("Authorization"),"Bearer ")
-
-		if len(authHeader) != 2{
-			fmt.Println("Malformed Header")
-			http.Error(w,"Invalid Header recieved",http.StatusBadRequest)
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, `{"error":"missing or malformed authorization header"}`, http.StatusUnauthorized)
 			return
-		}else{
-			token:=authHeader[1]
-			jwt_token,err:=auth.VerifyJWTToken(token)
-			
-			if err != nil{
-				fmt.Println("Invalid Token recieved")
-				http.Error(w,"Invalid Token recieved",http.StatusUnauthorized)
-				return
-			}
-
-			claims,ok:=jwt_token.Claims.(jwt.MapClaims)
-
-			if !ok{
-				http.Error(w, "Invalid token claims", http.StatusUnauthorized)
-				return
-			}
-
-			userID, ok := claims["userId"].(string)
-			if !ok || strings.TrimSpace(userID) == "" {
-				http.Error(w, "token has no userId",http.StatusUnauthorized)
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), userIDKey, userID)
-			next.ServeHTTP(w, r.WithContext(ctx))
-
 		}
 
+		rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := auth.VerifyIdentityToken(rawToken)
+		if err != nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, RoleKey, claims.Role)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
