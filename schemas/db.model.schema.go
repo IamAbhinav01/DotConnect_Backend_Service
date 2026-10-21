@@ -26,8 +26,3 @@ type WorkSpace struct{
 	UpdatedAt   time.Time         `bson:"updatedAt" json:"updatedAt"`
 }
 
-type WorkSpaceCreationDTO struct{
-	Name string `bson:"name" json:"name"`
-	Slug        string `json:"slug,omitempty"`
-	Description string `bson:"description,omitempty" json:"description,omitempty"`
-}
