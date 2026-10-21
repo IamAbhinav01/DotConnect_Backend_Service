@@ -2,6 +2,10 @@ package app
 
 import (
 	"DotConnect/config"
+	"DotConnect/controllers"
+	"DotConnect/repositories"
+	"DotConnect/router"
+	"DotConnect/services"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,6 +32,15 @@ func (app *Application) Run() error{
 
 	fmt.Println("Succesfully connected to the database")
 
+
+	wsRepo := repositories.NewWorkspaceRepository(config.DotConnect)
+	wsServ := services.NewWorkspaceService(wsRepo)
+	wsCntrl := controllers.NewWorkspaceController(wsServ)
+	wsRouter := router.NewWorkspaceRouter(wsCntrl)
+
+
+	chiRouter := router.SetupRouter(router.AppRouters{WorkspaceRouter: wsRouter})
+
 	port := app.PORT
 	if(!strings.HasPrefix(port,":")){
 		port = ":"+port
@@ -37,7 +50,7 @@ func (app *Application) Run() error{
 
 	server:= http.Server{
 		Addr: port,
-		Handler:  http.DefaultServeMux,
+		Handler:  chiRouter,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}

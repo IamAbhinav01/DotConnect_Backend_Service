@@ -4,11 +4,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
-
-type Router interface {
-	Register(chi.Router)
+type AppRouters struct {
+	WorkspaceRouter *WorkspaceRouter
 }
-func SetupRouter(Router Router) *chi.Mux {
+
+func SetupRouter(routers AppRouters) *chi.Mux {
 
 	chiRouter := chi.NewRouter()
 	
@@ -22,12 +22,10 @@ func SetupRouter(Router Router) *chi.Mux {
 	}))
 
 
-	apiRouter := chi.NewRouter()
-	Router.Register(apiRouter)
+	workSpaceRouter := chi.NewRouter()
+	routers.WorkspaceRouter.Register(workSpaceRouter)
 
-	chiRouter.Mount("/api/v1/workspace", apiRouter)
-	chiRouter.Mount("/api/v1/channels",apiRouter)
-	chiRouter.Mount("/api/v1/messages",apiRouter)
+	chiRouter.Mount("/api/v1/workspace", workSpaceRouter)
 
 	
 	return chiRouter
