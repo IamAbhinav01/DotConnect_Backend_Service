@@ -26,6 +26,8 @@ func SetupRouter(routers AppRouters) *chi.Mux {
 	routers.WorkspaceRouter.Register(workSpaceRouter)
 
 	chiRouter.Mount("/api/v1/workspace", workSpaceRouter)
+	chiRouter.Mount("/workspace", workSpaceRouter)
+	chiRouter.Mount("/", workSpaceRouter)
 
 	
 	return chiRouter

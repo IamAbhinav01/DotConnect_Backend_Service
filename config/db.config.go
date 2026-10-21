@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -28,21 +29,23 @@ func ConnectToDB() error{
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	ClientOptions := options.Client().ApplyURI(MONGODB_URI)
-	mongoClient,err := mongo.Connect(ClientOptions)
-
-	if err!= nil{
-		return fmt.Errorf("Error occured while connecting to mongodb")
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	ClientOptions := options.Client().ApplyURI(MONGODB_URI).SetTLSConfig(tlsConfig)
+	mongoClient, err := mongo.Connect(ClientOptions)
+	if err != nil {
+		return fmt.Errorf("Error occured while connecting to mongodb: %w", err)
 	}
 
-
-	err = mongoClient.Ping(context.Background(),nil)
-	if err != nil{
-		return fmt.Errorf("Error occured while pinging to the database: %w",err)
+	err = mongoClient.Ping(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("Error occured while pinging to the database: %w", err)
 	}
 
-	Database := mongoClient.Database(DB_NAME)
-	DotConnect = Database.Collection(DOTCONNECT_COLLECTION)
+	Client = mongoClient
+	Db = mongoClient.Database(DB_NAME)
+	DotConnect = Db.Collection(DOTCONNECT_COLLECTION)
 	if err := ensureIndexes(ctx); err != nil {
 		return fmt.Errorf("failed to create indexes: %w", err)
 	}
