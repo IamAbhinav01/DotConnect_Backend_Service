@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"DotConnect/dto"
+	"DotConnect/middlewares"
 	"DotConnect/services"
 	"net/http"
 )
@@ -16,5 +18,9 @@ func NewWorkspaceController(_s services.WorkspaceService)*WorkspaceController{
 }
 
 func (cntrl *WorkspaceController)CreateWorkspace(w http.ResponseWriter, r *http.Request){
+
+	dtoPayload := r.Context().Value(middlewares.PayloadContextKey).(dto.WorkSpaceCreationDTO)
+
+	dtoPayload.
 
 }

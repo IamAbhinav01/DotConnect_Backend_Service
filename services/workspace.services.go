@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type WorkspaceService interface {
@@ -30,12 +31,23 @@ func(s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context,ownerId string
 	}
 	description := dto.Description
 	slug := dto.Slug
+	
+
 
 	ws := &schemas.WorkSpace{
 		Name: name,
 		Description: description,
 		Slug: slug,
 	}
+
+	ws.Members = []schemas.WorkspaceMember{
+		{
+			UserID:   ownerId,
+			Role:     schemas.RoleOwner,
+			JoinedAt: time.Now(),
+		},
+	}
+	
 
 	_,err:=s.repo.CreateWorkspace(ctx,ws)
 	if err!= nil{
