@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"regexp"
 	"strings"
 )
@@ -19,4 +21,12 @@ func Slugify(name string) string{
 	}
 
 	return slug
+}
+
+func SlugCollisionHandler(slug string) string{
+	// if ente kaiyil same name ulla vera slug veruvane 
+
+	b:=make([]byte, 2)
+	 _, _ = rand.Read(b)
+    return slug + "-" + hex.EncodeToString(b)
 }
