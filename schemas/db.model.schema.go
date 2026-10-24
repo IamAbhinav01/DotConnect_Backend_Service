@@ -12,6 +12,7 @@ const RoleMemebr string = "member"
 
 type WorkspaceMember struct {
 	UserID   string `bson:"userId" json:"userId"`
+	AvatarURL string `bson:"avatar" json:"avatar"`
 	Role     string `bson:"role" json:"role"`
 	JoinedAt time.Time `bson:"joinedAt" json:"joinedAt"`
 }
