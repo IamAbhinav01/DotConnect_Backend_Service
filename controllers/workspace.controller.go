@@ -42,3 +42,20 @@ func (cntrl *WorkspaceController) CreateWorkspace(w http.ResponseWriter, r *http
 
 	response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
 }
+
+
+func (cntrl *WorkspaceController) GetAllUserWorkspace(w http.ResponseWriter, r *http.Request) {
+	
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+	
+    workspaces, err := cntrl.s.GetUserWorkspace(r.Context(),userID)
+    if err != nil {
+        response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+        return
+    }
+    response.SucessResponse(w, http.StatusOK, "Workspaces fetched", workspaces)
+}

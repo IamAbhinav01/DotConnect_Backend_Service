@@ -8,11 +8,12 @@ import (
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type WorkspaceRepository interface {
 	CreateWorkspace(ctx context.Context,workspacePayload *schemas.WorkSpace) (*schemas.WorkSpace,error)
-	GetAllWorkspaces()
+	GetAllWorkspaces(ctx context.Context,userId string) ([]*schemas.WorkSpace,error)
 }
 
 type WorkspaceRepositoryImpl struct {
@@ -41,6 +42,19 @@ func (repo *WorkspaceRepositoryImpl)CreateWorkspace(ctx context.Context,workspac
 
 
 
-func (repo *WorkspaceRepositoryImpl) GetAllWorkspaces(){
+func (repo *WorkspaceRepositoryImpl) GetAllWorkspaces(ctx context.Context,userId string) ([]*schemas.WorkSpace,error){
 	
+	cursor,err := repo.db.Find(ctx,bson.M{"members.userId": userId}, options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+	if err != nil{
+		return nil, fmt.Errorf("error fetching workspaces: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var workspaces []*schemas.WorkSpace
+
+	err = cursor.All(ctx, &workspaces)
+	if err != nil{
+		return nil, fmt.Errorf("error decoding workspaces: %w", err)
+	}
+	return workspaces,nil
 }

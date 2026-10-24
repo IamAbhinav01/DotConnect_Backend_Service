@@ -20,4 +20,5 @@ func NewWorkspaceRouter(ctrl *controllers.WorkspaceController) *WorkspaceRouter 
 
 func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware, middlewares.WorkSpaceCreation).Post("/", ws.WorkspaceController.CreateWorkspace)
+	r.With(middlewares.AuthMiddleware).Get("/",ws.WorkspaceController.GetAllUserWorkspace)
 }

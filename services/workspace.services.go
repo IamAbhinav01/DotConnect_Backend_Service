@@ -13,6 +13,7 @@ import (
 
 type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context,ownerId string,dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error)
+	GetUserWorkspace(ctx context.Context,userId string)([]dto.WorkSpaceResponseDTO, error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -59,4 +60,25 @@ func(s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context,ownerId string
 		return nil,err
 	}
 	return ws,nil
+}
+func (s *WorkspaceServiceImpl) GetUserWorkspace(ctx context.Context,userId string)([]dto.WorkSpaceResponseDTO, error){
+	workspaces,err := s.repo.GetAllWorkspaces(ctx,userId)
+	if err != nil{
+		return nil, err
+	}
+
+	result := make([]dto.WorkSpaceResponseDTO, len(workspaces))
+    for i, workspace := range workspaces {
+        result[i] = dto.WorkSpaceResponseDTO{
+            ID:          workspace.ID,
+            Name:        workspace.Name,
+            Slug:        workspace.Slug,
+            Description: workspace.Description,
+            Members:     workspace.Members,
+            CreatedAt:   workspace.CreatedAt,
+            UpdatedAt:   workspace.UpdatedAt,
+        }
+    }
+
+    return result, nil
 }
