@@ -25,6 +25,7 @@ func NewWorkspaceService(_repo repositories.WorkspaceRepository) *WorkspaceServi
 }
 
 func(s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context,ownerId string,dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error){
+	
 	name := strings.TrimSpace(dto.Name)
 	if name == ""{
 		return nil,fmt.Errorf("workspace name cannot be empty")
