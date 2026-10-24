@@ -4,6 +4,7 @@ import (
 	"DotConnect/dto"
 	"DotConnect/repositories"
 	"DotConnect/schemas"
+	"DotConnect/utils/generator"
 	"context"
 	"fmt"
 	"strings"
@@ -33,6 +34,9 @@ func(s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context,ownerId string
 	description := dto.Description
 	slug := dto.Slug
 	
+	if strings.TrimSpace(slug) == ""{
+		slug = generator.Slugify(dto.Name)
+	}
 
 
 	ws := &schemas.WorkSpace{
