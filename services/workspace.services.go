@@ -107,12 +107,42 @@ func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug str
 		return false,fmt.Errorf("workspace not found")
 	}
 
-	is_authorised = false
+	is_authorised := false
 	for _,value := range ws.Members{
 		if(value.UserID == requsterId && (value.Role == schemas.RoleAdmin ||value.Role == schemas.RoleOwner)){
-			
+			is_authorised = true
+			break
 		}
 	}
 
-	s.repo.AddMemberToWorkspace(ctx,slug,)
+	if(!is_authorised){
+		return false,fmt.Errorf("forbidden: only owners and admins can add members")
+	}
+
+	isalreadyMember,err:=s.repo.MemberExists(ctx,slug,member.UserID)
+	if err != nil{
+		return false,err
+	}
+
+	if(isalreadyMember){
+		return  false,fmt.Errorf("user is already a member of this workspace")
+	}
+
+	memberPayload:=schemas.WorkspaceMember{
+		UserID: member.UserID,
+		AvatarURL: "/api/v1/users/" + member.UserID + "/avatar",
+		Role: member.Role,
+		JoinedAt: time.Now(),
+	}
+	
+	ok,err := s.repo.AddMemberToWorkspace(ctx,slug,memberPayload)
+	if err!= nil{
+		return false,err
+	}
+
+	if(!ok){
+		return false,fmt.Errorf("Error occured while adding member to the workspace, check with the db side")
+	}
+
+	return true,nil
 }

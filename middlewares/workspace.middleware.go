@@ -34,3 +34,30 @@ func WorkSpaceCreation(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
+
+var AddToMemberContextKey contextKey = "addmemberContextKey"
+
+func AddMemberValidation(next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+
+			var payload dto.AddMemberDTO
+
+			err := json.DecodeFromJSON(r, &payload)
+			if err != nil {
+				response.ErrorResponse(w, http.StatusBadRequest, "Error occured while decoding the json", err)
+				return
+			}
+			validationErr := validator.Validate.Struct(payload)
+			if validationErr != nil {
+				response.ErrorResponse(w, http.StatusBadRequest, "Invalid Bad Request Payload", validationErr)
+				return
+			}
+
+			reqContext := r.Context()
+			ctx := context.WithValue(reqContext, AddToMemberContextKey, payload)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+}
+
