@@ -13,6 +13,14 @@ type WorkSpaceCreationDTO struct {
 	Description string `json:"description" validate:"omitempty,max=1000"`
 }
 
+
+type AddMemberDTO struct{
+	UserID string `json:"userId" validate:"required"`
+    Role   string `json:"role"   validate:"required,oneof=admin member"`
+}
+
+
+
 type WorkSpaceResponseDTO struct {
 	ID          bson.ObjectID     `json:"id"`
 	Name        string            `json:"name"`

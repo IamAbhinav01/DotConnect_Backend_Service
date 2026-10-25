@@ -59,7 +59,7 @@ func (s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context, ownerId stri
 			Members: []schemas.WorkspaceMember{
 				{
 					UserID:   ownerId,
-					AvatarURL: //have to think of a way,
+					AvatarURL: "/api/v1/users/" + ownerId + "/avatar",
 					Role:     schemas.RoleOwner,
 					JoinedAt: time.Now(),
 				},
