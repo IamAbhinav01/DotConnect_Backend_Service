@@ -14,6 +14,7 @@ import (
 type WorkspaceRepository interface {
 	CreateWorkspace(ctx context.Context, workspacePayload *schemas.WorkSpace) (*schemas.WorkSpace, error)
 	GetAllWorkspaces(ctx context.Context, userId string) ([]*schemas.WorkSpace, error)
+	GetSlug(ctx context.Context,slug string)(*schemas.WorkSpace, error)
 	SlugAlreadyExists(ctx context.Context, slug string) (bool, error)
 	AddMemberToWorkspace(ctx context.Context,slug string,member schemas.WorkspaceMember)(bool,error)
 	MemberExists(ctx context.Context,slug string,userId string) (bool, error)
@@ -65,6 +66,16 @@ func (repo *WorkspaceRepositoryImpl) SlugAlreadyExists(ctx context.Context, slug
 	return count > 0, err
 }
 
+func (repo *WorkspaceRepositoryImpl)MemberExists(ctx context.Context,slug string,userId string) (bool, error){
+	
+	count, err := repo.db.CountDocuments(ctx, bson.M{"slug": slug,"members.userId":userId})
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, err
+}
+
 func(repo *WorkspaceRepositoryImpl) AddMemberToWorkspace(ctx context.Context,slug string,member schemas.WorkspaceMember)(bool,error){
 	
 	filter:= bson.M{"slug":slug}
@@ -86,12 +97,13 @@ func(repo *WorkspaceRepositoryImpl) AddMemberToWorkspace(ctx context.Context,slu
 	return true,nil
 }
 
-func (repo *WorkspaceRepositoryImpl)MemberExists(ctx context.Context,slug string,userId string) (bool, error){
-	
-	count, err := repo.db.CountDocuments(ctx, bson.M{"slug": slug,"members.userId":userId})
-	if err != nil {
-        return false, err
-    }
+func (repo *WorkspaceRepositoryImpl) GetSlug(ctx context.Context,slug string)(*schemas.WorkSpace, error){
 
-	return count > 0, err
+	var workspaces *schemas.WorkSpace
+	err := repo.db.FindOne(ctx,bson.M{"slug":slug}).Decode(&workspaces)
+	if err != nil{
+		return nil, err
+	}
+
+	return workspaces,nil
 }

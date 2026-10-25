@@ -16,6 +16,7 @@ import (
 type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, ownerId string, dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error)
 	GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error)
+	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -97,4 +98,21 @@ func (s *WorkspaceServiceImpl) GetUserWorkspace(ctx context.Context, userId stri
 	}
 
 	return result, nil
+}
+
+func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error){
+
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return false,fmt.Errorf("workspace not found")
+	}
+
+	is_authorised = false
+	for _,value := range ws.Members{
+		if(value.UserID == requsterId && (value.Role == schemas.RoleAdmin ||value.Role == schemas.RoleOwner)){
+			
+		}
+	}
+
+	s.repo.AddMemberToWorkspace(ctx,slug,)
 }
