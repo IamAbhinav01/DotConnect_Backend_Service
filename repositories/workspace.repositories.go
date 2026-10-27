@@ -20,11 +20,12 @@ type WorkspaceRepository interface {
 	MemberExists(ctx context.Context,slug string,userId string) (bool, error)
 	AlreadyAdmin(ctx context.Context,slug string,userId string,role string) (bool, error)
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
-	// RemoveMemberFromWorkspace()
-	// UpdateWorkspace()
-	// DeleteWorkspace()
-	// GetAllMembersInWorkspace()
+	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	// JoinByInvite()
+	// UpdateWorkspace()
+	// RemoveMemberFromWorkspace()
+	// DeleteWorkspace()
+	
 }
 
 type WorkspaceRepositoryImpl struct {
@@ -66,6 +67,16 @@ func (repo *WorkspaceRepositoryImpl) GetAllWorkspaces(ctx context.Context, userI
 		return nil, fmt.Errorf("error decoding workspaces: %w", err)
 	}
 	return workspaces, nil
+}
+
+func (repo *WorkspaceRepositoryImpl) GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error)  {
+
+	var ws schemas.WorkSpace
+	err := repo.db.FindOne(ctx, bson.M{"slug": slug}).Decode(&ws)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching workspace members: %w", err)
+	}
+	return ws.Members, nil
 }
 
 func (repo *WorkspaceRepositoryImpl) SlugAlreadyExists(ctx context.Context, slug string) (bool, error) {

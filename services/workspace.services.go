@@ -17,6 +17,7 @@ import (
 type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, ownerId string, dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error)
 	GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error)
+	GetAllMembers(ctx context.Context, slug string) ([]dto.MemberResponseDTO, error)
 	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
@@ -81,6 +82,7 @@ func (s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context, ownerId stri
 		return createdWorkspace, nil
 	}
 }
+
 func (s *WorkspaceServiceImpl) GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error) {
 	workspaces, err := s.repo.GetAllWorkspaces(ctx, userId)
 	if err != nil {
@@ -97,6 +99,26 @@ func (s *WorkspaceServiceImpl) GetUserWorkspace(ctx context.Context, userId stri
 			Members:     workspace.Members,
 			CreatedAt:   workspace.CreatedAt,
 			UpdatedAt:   workspace.UpdatedAt,
+		}
+	}
+
+	return result, nil
+}
+
+func (s *WorkspaceServiceImpl) GetAllMembers(ctx context.Context, slug string) ([]dto.MemberResponseDTO, error) {
+	
+	members, err := s.repo.GetAllMembers(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.MemberResponseDTO, len(members))
+	for i, member := range members {
+		result[i] = dto.MemberResponseDTO{
+			UserID: member.UserID,
+			AvatarURL: member.AvatarURL,
+			Role: member.Role,
+			JoinedAt: member.JoinedAt,
 		}
 	}
 

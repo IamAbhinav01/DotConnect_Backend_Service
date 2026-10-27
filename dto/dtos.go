@@ -30,3 +30,10 @@ type WorkSpaceResponseDTO struct {
 	CreatedAt   time.Time         `json:"createdAt"`
 	UpdatedAt   time.Time         `json:"updatedAt"`
 }
+
+type MemberResponseDTO struct {
+	UserID   string `json:"userId"`
+	AvatarURL string `json:"avatar"`
+	Role     string `json:"role"`
+	JoinedAt time.Time `json:"JoinedAt"`
+}

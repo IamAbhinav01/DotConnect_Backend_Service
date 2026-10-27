@@ -62,6 +62,22 @@ func (cntrl *WorkspaceController) GetAllUserWorkspace(w http.ResponseWriter, r *
     response.SucessResponse(w, http.StatusOK, "Workspaces fetched", workspaces)
 }
 
+func (cntrl *WorkspaceController) GetAllMembers(w http.ResponseWriter, r *http.Request) {
+	
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace slug is required", nil)
+		return
+	}
+	
+    workspaces, err := cntrl.s.GetAllMembers(r.Context(),slug)
+    if err != nil {
+        response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+        return
+    }
+    response.SucessResponse(w, http.StatusOK, "members fetched", workspaces)
+}
+
 
 func (cntrl *WorkspaceController) AddMemberTOWorkspace(w http.ResponseWriter, r *http.Request){
 
