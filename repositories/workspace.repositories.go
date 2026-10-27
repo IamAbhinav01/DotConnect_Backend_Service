@@ -20,8 +20,7 @@ type WorkspaceRepository interface {
 	MemberExists(ctx context.Context,slug string,userId string) (bool, error)
 	RemoveMemberFromWorkspace()
 	UpdateWorkspace()
-	PromoteMember(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
-	DemoteMember(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
+	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	DeleteWorkspace()
 	GetAllMembersInWorkspace()
 	JoinByInvite()
@@ -114,7 +113,7 @@ func (repo *WorkspaceRepositoryImpl) GetSlug(ctx context.Context,slug string)(*s
 
 	return workspaces,nil
 }
-func (repo *WorkspaceRepositoryImpl)PromoteMember(ctx context.Context,slug string,targetUser string, newRole string)(bool,error){
+func (repo *WorkspaceRepositoryImpl)UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error){
 
 	filter:=bson.M{"slug":slug,"members.userId":targetUser}
 	update:=bson.M{
@@ -124,26 +123,7 @@ func (repo *WorkspaceRepositoryImpl)PromoteMember(ctx context.Context,slug strin
 
 	result,err := repo.db.UpdateOne(ctx,filter,update)
 	if err != nil{
-		return false,fmt.Errorf("error promoting member: %w",err)
-	}
-
-	if result.MatchedCount == 0{
-		return false,fmt.Errorf("workspace not found or user is not a member of this workspace")
-	}
-
-	return true,nil
-}
-func (repo *WorkspaceRepositoryImpl)DemoteMember(ctx context.Context,slug string,targetUser string, newRole string)(bool,error){
-
-	filter:=bson.M{"slug":slug,"members.userId":targetUser}
-	update:=bson.M{
-		"$set":bson.M{"members.$.role":newRole,
-			"updatedAt":time.Now()},
-	}
-
-	result,err := repo.db.UpdateOne(ctx,filter,update)
-	if err != nil{
-		return false,fmt.Errorf("error demoting member: %w",err)
+		return false,fmt.Errorf("error updating member role: %w",err)
 	}
 
 	if result.MatchedCount == 0{
