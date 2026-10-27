@@ -19,6 +19,7 @@ type WorkspaceService interface {
 	GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error)
 	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
+	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -190,6 +191,54 @@ func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requ
 	}
 
 	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,schemas.RoleAdmin)
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+
+}
+
+func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error){
+
+
+	if requesterId == targetUser {
+		return false, fmt.Errorf("bad request: you cannot demote yourself")
+	}
+
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return false,fmt.Errorf("workspace not found")
+	}
+
+	var requesterMember *schemas.WorkspaceMember
+	var targetMember *schemas.WorkspaceMember
+
+	for i := range ws.Members {
+		if ws.Members[i].UserID == requesterId {
+			requesterMember = &ws.Members[i]
+		}
+		if ws.Members[i].UserID == targetUser {
+			targetMember = &ws.Members[i]
+		}
+	}
+
+	if requesterMember == nil || (requesterMember.Role != schemas.RoleOwner) {
+		return false, fmt.Errorf("forbidden: only owners can demote members")
+	}
+
+	if targetMember == nil {
+		return false, fmt.Errorf("bad request: target user is not a member of this workspace")
+	}
+
+	if targetMember.Role == schemas.RoleOwner {
+		return false, fmt.Errorf("bad request: cannot demote the workspace owner")
+	}
+
+	if targetMember.Role == schemas.RoleMemebr {
+		return false, fmt.Errorf("bad request: user is already a member")
+	}
+
+	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,schemas.RoleMemebr)
 	if err != nil {
 		return false, err
 	}
