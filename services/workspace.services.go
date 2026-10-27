@@ -4,6 +4,7 @@ import (
 	"DotConnect/dto"
 	"DotConnect/repositories"
 	"DotConnect/schemas"
+	"DotConnect/utils/constants"
 	"DotConnect/utils/generator"
 	"context"
 	"fmt"
@@ -110,7 +111,7 @@ func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug str
 
 	is_authorised := false
 	for _,value := range ws.Members{
-		if(value.UserID == requsterId && (value.Role == schemas.RoleAdmin ||value.Role == schemas.RoleOwner)){
+		if(value.UserID == requsterId && constants.Is_Manager(value.Role)){
 			is_authorised = true
 			break
 		}
@@ -150,29 +151,48 @@ func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug str
 
 func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error){
 
+
+	if requesterId == targetUser {
+		return false, fmt.Errorf("bad request: you cannot promote yourself")
+	}
+
 	ws,err := s.repo.GetSlug(ctx,slug)
 	if err != nil{
 		return false,fmt.Errorf("workspace not found")
 	}
 
-	is_authorised := false
-	for _,value := range ws.Members{
-		if(value.UserID == requesterId && (value.Role == schemas.RoleAdmin ||value.Role == schemas.RoleOwner)){
-			is_authorised = true
-			break
+	var requesterMember *schemas.WorkspaceMember
+	var targetMember *schemas.WorkspaceMember
+
+	for i := range ws.Members {
+		if ws.Members[i].UserID == requesterId {
+			requesterMember = &ws.Members[i]
+		}
+		if ws.Members[i].UserID == targetUser {
+			targetMember = &ws.Members[i]
 		}
 	}
 
-	if(!is_authorised){
-		return false,fmt.Errorf("forbidden: only owners and admins can promote members")
+	if requesterMember == nil || !constants.Is_Manager(requesterMember.Role) {
+		return false, fmt.Errorf("forbidden: only owners and admins can promote members")
 	}
 
-	isalreadyMember,err:=s.repo.AlreadyAdmin(ctx,slug,targetUser,"owner")
-	if err != nil{
-		return false,err
+	if targetMember == nil {
+		return false, fmt.Errorf("bad request: target user is not a member of this workspace")
 	}
 
-	if(isalreadyMember){
-		return  false,fmt.Errorf("user is already a member of this workspace")
+	if targetMember.Role == schemas.RoleOwner {
+		return false, fmt.Errorf("bad request: cannot promote the workspace owner")
 	}
+
+	if targetMember.Role == schemas.RoleAdmin {
+		return false, fmt.Errorf("bad request: user is already an admin")
+	}
+
+	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,schemas.RoleAdmin)
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+
 }
