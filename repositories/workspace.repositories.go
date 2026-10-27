@@ -18,6 +18,12 @@ type WorkspaceRepository interface {
 	SlugAlreadyExists(ctx context.Context, slug string) (bool, error)
 	AddMemberToWorkspace(ctx context.Context,slug string,member schemas.WorkspaceMember)(bool,error)
 	MemberExists(ctx context.Context,slug string,userId string) (bool, error)
+	RemoveMemberFromWorkspace()
+	UpdateWorkspace()
+	PromoteMember()
+	DeleteWorkspace()
+	GetAllMembersInWorkspace()
+	JoinByInvite()
 }
 
 type WorkspaceRepositoryImpl struct {
