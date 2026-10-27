@@ -22,4 +22,6 @@ func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware, middlewares.WorkSpaceCreation).Post("/", ws.WorkspaceController.CreateWorkspace)
 	r.With(middlewares.AuthMiddleware).Get("/",ws.WorkspaceController.GetAllUserWorkspace)
 	r.With(middlewares.AuthMiddleware, middlewares.AddMemberValidation).Post("/{slug}/members", ws.WorkspaceController.AddMemberTOWorkspace)
+	r.With(middlewares.AuthMiddleware,middlewares.AddMemberValidation).Post("/{slug}/members/promote",ws.WorkspaceController.PromoteMember)
+	r.With(middlewares.AuthMiddleware,middlewares.AddMemberValidation).Post("/{slug}/members/demote",ws.WorkspaceController.DemoteMember)
 }

@@ -19,12 +19,12 @@ type WorkspaceRepository interface {
 	AddMemberToWorkspace(ctx context.Context,slug string,member schemas.WorkspaceMember)(bool,error)
 	MemberExists(ctx context.Context,slug string,userId string) (bool, error)
 	AlreadyAdmin(ctx context.Context,slug string,userId string,role string) (bool, error)
-	RemoveMemberFromWorkspace()
-	UpdateWorkspace()
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
-	DeleteWorkspace()
-	GetAllMembersInWorkspace()
-	JoinByInvite()
+	// RemoveMemberFromWorkspace()
+	// UpdateWorkspace()
+	// DeleteWorkspace()
+	// GetAllMembersInWorkspace()
+	// JoinByInvite()
 }
 
 type WorkspaceRepositoryImpl struct {
