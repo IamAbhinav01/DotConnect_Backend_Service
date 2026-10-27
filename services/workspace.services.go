@@ -17,6 +17,7 @@ type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, ownerId string, dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error)
 	GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error)
 	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
+	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -145,4 +146,33 @@ func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug str
 	}
 
 	return true,nil
+}
+
+func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error){
+
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return false,fmt.Errorf("workspace not found")
+	}
+
+	is_authorised := false
+	for _,value := range ws.Members{
+		if(value.UserID == requesterId && (value.Role == schemas.RoleAdmin ||value.Role == schemas.RoleOwner)){
+			is_authorised = true
+			break
+		}
+	}
+
+	if(!is_authorised){
+		return false,fmt.Errorf("forbidden: only owners and admins can promote members")
+	}
+
+	isalreadyMember,err:=s.repo.AlreadyAdmin(ctx,slug,targetUser,"owner")
+	if err != nil{
+		return false,err
+	}
+
+	if(isalreadyMember){
+		return  false,fmt.Errorf("user is already a member of this workspace")
+	}
 }
