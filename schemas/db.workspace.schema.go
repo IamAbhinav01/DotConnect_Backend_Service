@@ -19,7 +19,14 @@ type WorkspaceInvite struct{
 
 
 type JoinRequest struct{
-
+	ID         bson.ObjectID `bson:"_id,omitempty" json:"id"`
+	InviteCode string        `bson:"inviteCode" json:"inviteCode"`
+	UserID     string        `bson:"userId" json:"userId"`
+	AvatarURL  string        `bson:"avatar" json:"avatar"`
+	Status     string        `bson:"status" json:"status"` // "pending" | "approved" | "rejected"
+	CreatedAt  time.Time     `bson:"createdAt" json:"createdAt"`
+	ReviewedAt *time.Time    `bson:"reviewedAt,omitempty" json:"reviewedAt,omitempty"`
+	ReviewedBy *string       `bson:"reviewedBy,omitempty" json:"reviewedBy,omitempty"`
 }
 
 type WorkspaceMember struct {
@@ -36,6 +43,7 @@ type WorkSpace struct{
 	Description string `bson:"description,omitempty" json:"description,omitempty"`
 	Members []WorkspaceMember `bson:"members" json:"members"`
 	Invites []WorkspaceInvite `bson:"invites,omitempty" json:"invites,omitempty"`
+	JoinRequests []JoinRequest     `bson:"joinRequests,omitempty" json:"joinRequests,omitempty"`
 	CreatedAt   time.Time         `bson:"createdAt" json:"createdAt"`
 	UpdatedAt   time.Time         `bson:"updatedAt" json:"updatedAt"`
 }

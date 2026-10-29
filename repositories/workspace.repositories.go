@@ -21,8 +21,12 @@ type WorkspaceRepository interface {
 	AlreadyAdmin(ctx context.Context,slug string,userId string,role string) (bool, error)
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
-	// JoinByInvite()
-	// JoinByInvite()
+	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite)
+	// GetInviteByCode()
+	// CreateJoinRequest()
+	// GetJoinRequests()
+	// ApproveJoinRequest()
+	// RejectJoinRequest()
 	// UpdateWorkspace()
 	// RemoveMemberFromWorkspace()
 	// DeleteWorkspace()
@@ -164,4 +168,7 @@ func (repo *WorkspaceRepositoryImpl)UpdateMemberRole(ctx context.Context,slug st
 	}
 
 	return true,nil
+}
+func (repo *WorkspaceRepositoryImpl)CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite){
+	filter:= bson.M{"slug":slug}
 }

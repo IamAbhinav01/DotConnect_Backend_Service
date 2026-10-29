@@ -19,8 +19,6 @@ type AddMemberDTO struct{
     Role   string `json:"role"   validate:"required,oneof=admin member"`
 }
 
-
-
 type WorkSpaceResponseDTO struct {
 	ID          bson.ObjectID     `json:"id"`
 	Name        string            `json:"name"`
@@ -36,4 +34,22 @@ type MemberResponseDTO struct {
 	AvatarURL string `json:"avatar"`
 	Role     string `json:"role"`
 	JoinedAt time.Time `json:"JoinedAt"`
+}
+
+type CreateInviteDTO struct {
+	MaxApprovedJoins int `json:"maxApprovedJoins" validate:"omitempty,min=1,max=100"` 
+	ExpiresInHours   int `json:"expiresInHours"   validate:"omitempty,min=1,max=168"` 
+}
+
+
+type InvitePreviewDTO struct {
+	WorkspaceName string    `json:"workspaceName"`
+	Slug          string    `json:"slug"`
+	Description   string    `json:"description,omitempty"`
+	MemberCount   int       `json:"memberCount"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	IsExpired     bool      `json:"isExpired"`
+	IsExhausted   bool      `json:"isExhausted"`
+	AlreadyMember bool      `json:"alreadyMember"`
+	RequestStatus string    `json:"requestStatus,omitempty"` // "none" | "pending" | "approved" | "rejected"
 }
