@@ -65,7 +65,7 @@ func (s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context, ownerId stri
 				{
 					UserID:   ownerId,
 					AvatarURL: "/api/v1/users/" + ownerId + "/avatar",
-					Role:     schemas.RoleOwner,
+					Role:     constants.ROLE_OWNER,
 					JoinedAt: time.Now(),
 				},
 			},
@@ -204,15 +204,15 @@ func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requ
 		return false, fmt.Errorf("bad request: target user is not a member of this workspace")
 	}
 
-	if targetMember.Role == schemas.RoleOwner {
+	if targetMember.Role == constants.ROLE_OWNER {
 		return false, fmt.Errorf("bad request: cannot promote the workspace owner")
 	}
 
-	if targetMember.Role == schemas.RoleAdmin {
+	if targetMember.Role == constants.ROLE_ADMIN {
 		return false, fmt.Errorf("bad request: user is already an admin")
 	}
 
-	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,schemas.RoleAdmin)
+	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,constants.ROLE_ADMIN)
 	if err != nil {
 		return false, err
 	}
@@ -244,7 +244,7 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 		}
 	}
 
-	if requesterMember == nil || (requesterMember.Role != schemas.RoleOwner) {
+	if requesterMember == nil || (requesterMember.Role != constants.ROLE_OWNER) {
 		return false, fmt.Errorf("forbidden: only owners can demote members")
 	}
 
@@ -252,15 +252,15 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 		return false, fmt.Errorf("bad request: target user is not a member of this workspace")
 	}
 
-	if targetMember.Role == schemas.RoleOwner {
+	if targetMember.Role == constants.ROLE_OWNER {
 		return false, fmt.Errorf("bad request: cannot demote the workspace owner")
 	}
 
-	if targetMember.Role == schemas.RoleMemebr {
+	if targetMember.Role == constants.ROLE_MEMBER {
 		return false, fmt.Errorf("bad request: user is already a member")
 	}
 
-	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,schemas.RoleMemebr)
+	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,constants.ROLE_MEMBER)
 	if err != nil {
 		return false, err
 	}

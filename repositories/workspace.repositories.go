@@ -22,6 +22,7 @@ type WorkspaceRepository interface {
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	// JoinByInvite()
+	// JoinByInvite()
 	// UpdateWorkspace()
 	// RemoveMemberFromWorkspace()
 	// DeleteWorkspace()
