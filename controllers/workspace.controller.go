@@ -6,6 +6,7 @@ import (
 	"DotConnect/services"
 	"DotConnect/utils/response"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -185,4 +186,38 @@ func (cntrl *WorkspaceController) DemoteMember(w http.ResponseWriter, r *http.Re
 	}
 
 	response.SucessResponse(w, http.StatusOK, "admin demoted successfully", nil)
+}
+
+func (cntrl *WorkspaceController) CreateInvite(w http.ResponseWriter, r *http.Request){
+
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace slug is required", nil)
+		return
+	}
+
+	dtoPayload, ok := r.Context().Value(middlewares.CreateInvitationContextKey).(dto.CreateInviteDTO)
+	
+	if !ok {
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid payload in context", nil)
+		return
+	}
+
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+	err := cntrl.s.CreateInvite(r.Context(),slug,userID,dtoPayload)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "forbidden") {
+			response.ErrorResponse(w, http.StatusForbidden, err.Error(), err)
+			return
+		}
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+	
+	response.SucessResponse(w, http.StatusOK, "Invite link created", nil)
 }

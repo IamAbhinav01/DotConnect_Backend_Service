@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
@@ -21,6 +22,7 @@ type WorkspaceService interface {
 	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
+	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
 }
 
 type WorkspaceServiceImpl struct {
@@ -266,4 +268,51 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 	}
 	return ok, nil
 
+}
+
+
+func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO)error{
+
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return fmt.Errorf("workspace not found")
+	}
+
+	var requesterMember *schemas.WorkspaceMember
+	for i := range ws.Members {
+		if ws.Members[i].UserID == requesterId && constants.Is_Manager(ws.Members[i].Role) {
+			requesterMember = &ws.Members[i]
+			break
+		}
+	}
+	if (requesterMember.Role == "") || (requesterMember.Role == constants.ROLE_MEMBER){
+		return fmt.Errorf("forbidden: only owners and admins can create invites")
+	}else{
+		maxJoins:=dto.MaxApprovedJoins
+		if maxJoins <= 0{
+			maxJoins= 5
+		}
+
+		hours := dto.ExpiresInHours
+		if hours <= 0{
+			hours = 24
+		}
+
+		invitation := schemas.WorkspaceInvite{
+			ID: bson.NewObjectID(),
+			Code: generator.GenerateInviteCode(slug),
+			CreatedBy: requesterId,
+			MaxApprovedJoins: maxJoins,
+			ApprovedCount: 0,
+			CreatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(time.Duration(hours)*time.Hour),
+		}
+
+		err := s.repo.CreateInvite(ctx,slug,invitation)
+		if err != nil{
+			return  fmt.Errorf("error occured while creating the invitation : %w",err)
+		}
+
+		return nil
+	}
 }

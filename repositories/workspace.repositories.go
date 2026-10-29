@@ -21,7 +21,7 @@ type WorkspaceRepository interface {
 	AlreadyAdmin(ctx context.Context,slug string,userId string,role string) (bool, error)
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
-	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite)
+	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
 	// GetInviteByCode()
 	// CreateJoinRequest()
 	// GetJoinRequests()
@@ -169,6 +169,19 @@ func (repo *WorkspaceRepositoryImpl)UpdateMemberRole(ctx context.Context,slug st
 
 	return true,nil
 }
-func (repo *WorkspaceRepositoryImpl)CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite){
+
+func (repo *WorkspaceRepositoryImpl)CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error{
 	filter:= bson.M{"slug":slug}
+	update := bson.M{
+		"$push": bson.M{"invites": invite},
+		"$set":  bson.M{"updatedAt": time.Now()},
+	}
+	result, err := repo.db.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("error creating invite: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("workspace not found")
+	}
+	return nil
 }
