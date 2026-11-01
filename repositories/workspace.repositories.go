@@ -22,7 +22,7 @@ type WorkspaceRepository interface {
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
-	// GetInviteByCode()
+	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace,error)
 	// CreateJoinRequest()
 	// GetJoinRequests()
 	// ApproveJoinRequest()
@@ -184,4 +184,8 @@ func (repo *WorkspaceRepositoryImpl)CreateInvite(ctx context.Context,slug string
 		return fmt.Errorf("workspace not found")
 	}
 	return nil
+}
+
+func (repo *WorkspaceRepositoryImpl)GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace,error){
+	filter:=bson.M{"code"}
 }
