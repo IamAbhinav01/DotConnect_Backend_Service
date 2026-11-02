@@ -247,3 +247,31 @@ func(cntrl *WorkspaceController) InvitePreview(w http.ResponseWriter, r *http.Re
 	
 	response.SucessResponse(w, http.StatusOK, "Invite preview fetched", preview)
 }
+
+func (cntrl *WorkspaceController) JoinWorkspaceRequest(w http.ResponseWriter, r *http.Request){
+
+	code := chi.URLParam(r, "code")
+	if code == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace invitation code is required", nil)
+		return
+	}
+
+	
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+	err := cntrl.s.CreateJoinRequest(r.Context(),code,userID)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "forbidden") {
+			response.ErrorResponse(w, http.StatusForbidden, err.Error(), err)
+			return
+		}
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+	
+	response.SucessResponse(w, http.StatusOK, "Join request submitted. Waiting for owner approval.", nil)
+}

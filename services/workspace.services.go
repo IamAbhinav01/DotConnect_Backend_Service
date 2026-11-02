@@ -359,13 +359,29 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 
 func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,userId string) error{
 
+	ws,invite,err := s.repo.GetInviteByCode(ctx,code)
 
-	//expiry time check
-	//member alreay present check
-	//maximum count check 
-	//doesnot have a pending request
+	slug := ws.Slug
 
+	if time.Now().After( invite.ExpiresAt){
+		return  fmt.Errorf("This invite link has expired")
+	} 
 
+	if invite.ApprovedCount >= invite.MaxApprovedJoins{
+		return fmt.Errorf("this invite has reached its maximum approved join limit")
+	}
+
+	for _,member := range ws.Members{
+		if member.UserID == userId{
+			return fmt.Errorf("you are already a member of this workspace")
+		}
+	}
+	
+	for _,req := range ws.JoinRequests{
+		if req.Status == "pending" && req.UserID == userId{
+			return fmt.Errorf("you already have a pending join request for this workspace")
+		}
+	}
 
 	joinReq := &schemas.JoinRequest{
 		ID: bson.NewObjectID(),
@@ -376,7 +392,8 @@ func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,u
 		CreatedAt: time.Now(),
 	}
 
-	err := s.repo.CreateJoinRequest(ctx,/*needed to setup this*/,joinReq)
+
+	err = s.repo.CreateJoinRequest(ctx,slug,joinReq)
 	if err!= nil{
 		return fmt.Errorf("error occured while sending joining to the workspace %w",err)
 	}
