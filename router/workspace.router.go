@@ -20,4 +20,11 @@ func NewWorkspaceRouter(ctrl *controllers.WorkspaceController) *WorkspaceRouter 
 
 func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware, middlewares.WorkSpaceCreation).Post("/", ws.WorkspaceController.CreateWorkspace)
+	r.With(middlewares.AuthMiddleware).Get("/",ws.WorkspaceController.GetAllUserWorkspace)
+	r.With(middlewares.AuthMiddleware).Get("/{slug}/members",ws.WorkspaceController.GetAllMembers)
+	r.With(middlewares.AuthMiddleware, middlewares.AddMemberValidation).Post("/{slug}/addMember", ws.WorkspaceController.AddMemberTOWorkspace)
+	r.With(middlewares.AuthMiddleware,middlewares.AddMemberValidation).Post("/{slug}/members/promote",ws.WorkspaceController.PromoteMember)
+	r.With(middlewares.AuthMiddleware,middlewares.AddMemberValidation).Post("/{slug}/members/demote",ws.WorkspaceController.DemoteMember)
+	r.With(middlewares.AuthMiddleware,middlewares.InvitationCreation).Post("/{slug}/invites",ws.WorkspaceController.CreateInvite)
+	r.With(middlewares.AuthMiddleware).Get("/invites/{code}",ws.WorkspaceController.InvitePreview)
 }
