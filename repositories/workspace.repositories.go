@@ -23,7 +23,7 @@ type WorkspaceRepository interface {
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
 	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
-	
+	CreateJoinRequest(ctx context.Context,slug string,req *schemas.JoinRequest) error
 	// CreateJoinRequest()
 	// GetJoinRequests()
 	// ApproveJoinRequest()
@@ -205,4 +205,22 @@ func (repo *WorkspaceRepositoryImpl)GetInviteByCode(ctx context.Context,code str
 		}
 	}
 	return nil, nil, fmt.Errorf("invite code not found")
+}
+
+func (repo *WorkspaceRepositoryImpl) CreateJoinRequest(ctx context.Context,slug string,req *schemas.JoinRequest) error{
+	
+	filter:= bson.M{"slug":slug}
+	update := bson.M{
+		"$push": bson.M{"joinRequests": req},
+		"$set":  bson.M{"updatedAt": time.Now()},
+	}
+
+	result,err := repo.db.UpdateOne(ctx,filter,update)
+	if err!= nil{
+		return fmt.Errorf("Error occured while submitting the joining request")
+	}
+	if result.MatchedCount == 0{
+		return fmt.Errorf("No workspace found")
+	}
+	return nil
 }

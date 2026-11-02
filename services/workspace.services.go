@@ -24,6 +24,7 @@ type WorkspaceService interface {
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
 	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
+	CreateJoinRequest(ctx context.Context,code string,userId string) error
 }
 
 type WorkspaceServiceImpl struct {
@@ -354,4 +355,30 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 
 	},nil
 
+}
+
+func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,userId string) error{
+
+
+	//expiry time check
+	//member alreay present check
+	//maximum count check 
+	//doesnot have a pending request
+
+
+
+	joinReq := &schemas.JoinRequest{
+		ID: bson.NewObjectID(),
+		InviteCode: code,
+		UserID: userId,
+		AvatarURL: "/api/v1/users/" + userId + "/avatar",
+		Status: "pending",
+		CreatedAt: time.Now(),
+	}
+
+	err := s.repo.CreateJoinRequest(ctx,/*needed to setup this*/,joinReq)
+	if err!= nil{
+		return fmt.Errorf("error occured while sending joining to the workspace %w",err)
+	}
+	return nil
 }
