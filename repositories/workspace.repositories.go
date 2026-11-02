@@ -23,6 +23,7 @@ type WorkspaceRepository interface {
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
 	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
+	
 	// CreateJoinRequest()
 	// GetJoinRequests()
 	// ApproveJoinRequest()

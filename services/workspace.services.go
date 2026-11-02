@@ -23,7 +23,7 @@ type WorkspaceService interface {
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
-	FetchInvitation(ctx context.Context,code string,userId string)(dto.InvitePreviewDTO,error)
+	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -324,6 +324,22 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 		return nil,err
 	}
 
+	isExpired := time.Now().After(inv.ExpiresAt)
+	isExhausted := inv.ApprovedCount >= inv.MaxApprovedJoins
+
+	isAlredyMember := false
+	for _,member:= range ws.Members{
+		if member.UserID == userId{
+			isAlredyMember = true
+			break
+		}
+	}
+
+	alreadyRequest := "none"
+	// for _,_ := range ws.JoinRequests{
+	// 	if 
+	// }
+
 
 	return &dto.InvitePreviewDTO{
 		WorkspaceName: ws.Name,
@@ -331,10 +347,10 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 		Description: ws.Description,
 		MemberCount: len(ws.Members),
 		ExpiresAt: inv.ExpiresAt,
-		IsExpired: nil //have to sortout this
-		IsExhausted: nil // need to sort out,
-		AlreadyMember: nil,//need to sort out,
-		RequestStatus: nil//need to sort out,
+		IsExpired: isExpired,
+		IsExhausted: isExhausted,
+		AlreadyMember: isAlredyMember,
+		RequestStatus: alreadyRequest,
 
 	},nil
 
