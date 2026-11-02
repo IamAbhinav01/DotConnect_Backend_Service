@@ -23,6 +23,7 @@ type WorkspaceService interface {
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
+	FetchInvitation(ctx context.Context,code string,userId string)(dto.InvitePreviewDTO,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -270,7 +271,6 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 
 }
 
-
 func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO)error{
 
 	ws,err := s.repo.GetSlug(ctx,slug)
@@ -315,4 +315,27 @@ func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,reques
 
 		return nil
 	}
+}
+
+func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error){
+
+	ws,inv,err:=s.repo.GetInviteByCode(ctx,code)
+	if err != nil{
+		return nil,err
+	}
+
+
+	return &dto.InvitePreviewDTO{
+		WorkspaceName: ws.Name,
+		Slug: ws.Slug,
+		Description: ws.Description,
+		MemberCount: len(ws.Members),
+		ExpiresAt: inv.ExpiresAt,
+		IsExpired: nil //have to sortout this
+		IsExhausted: nil // need to sort out,
+		AlreadyMember: nil,//need to sort out,
+		RequestStatus: nil//need to sort out,
+
+	},nil
+
 }

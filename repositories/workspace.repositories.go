@@ -22,7 +22,7 @@ type WorkspaceRepository interface {
 	UpdateMemberRole(ctx context.Context,slug string,targetUser string, newRole string)(bool,error)
 	GetAllMembers(ctx context.Context, slug string) ([]schemas.WorkspaceMember, error) 
 	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
-	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace,error)
+	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
 	// CreateJoinRequest()
 	// GetJoinRequests()
 	// ApproveJoinRequest()
@@ -186,6 +186,22 @@ func (repo *WorkspaceRepositoryImpl)CreateInvite(ctx context.Context,slug string
 	return nil
 }
 
-func (repo *WorkspaceRepositoryImpl)GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace,error){
-	filter:=bson.M{"code"}
+func (repo *WorkspaceRepositoryImpl)GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error){
+	filter:=bson.M{"invites.code":code}
+
+	var ws schemas.WorkSpace
+	err := repo.db.FindOne(ctx,filter).Decode(&ws)
+	if err != nil{
+		if err == mongo.ErrNoDocuments {
+			return nil, nil, fmt.Errorf("invalid invite link")
+		}
+		return nil, nil, fmt.Errorf("error finding invite: %w", err)
+	}
+
+	for _, inv := range ws.Invites {
+		if inv.Code == code {
+			return &ws, &inv, nil
+		}
+	}
+	return nil, nil, fmt.Errorf("invite code not found")
 }
