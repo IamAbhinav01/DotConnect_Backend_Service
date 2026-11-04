@@ -25,6 +25,8 @@ type WorkspaceService interface {
 	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
 	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
 	CreateJoinRequest(ctx context.Context,code string,userId string) error
+	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
+
 }
 
 type WorkspaceServiceImpl struct {
@@ -337,9 +339,11 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 	}
 
 	alreadyRequest := "none"
-	// for _,_ := range ws.JoinRequests{
-	// 	if 
-	// }
+	for _,req := range ws.JoinRequests{
+		if req.UserID == userId && req.InviteCode == code{
+			alreadyRequest = req.Status
+		}
+	}
 
 
 	return &dto.InvitePreviewDTO{
@@ -398,4 +402,41 @@ func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,u
 		return fmt.Errorf("error occured while sending joining to the workspace %w",err)
 	}
 	return nil
+}
+
+func(s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error){
+	
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		
+		return nil,fmt.Errorf("Unable to fetch the workspace")
+	}
+
+	isAuthorised := false;
+	for _,mem:= range  ws.Members{
+		if mem.UserID == requesterId && (mem.Role == constants.ROLE_ADMIN || mem.Role == constants.ROLE_OWNER){
+			isAuthorised = true
+			break
+		}
+	}
+	if !isAuthorised{
+		
+		return nil,fmt.Errorf("User is not having the required permission to see the list of requests")
+	}
+	
+	requests,err := s.repo.GetJoinRequest(ctx,slug)
+	if err != nil{
+	
+		return nil,fmt.Errorf("Error occured while fetching all the invitations.")
+	}
+
+	pendingRequests := make([]schemas.JoinRequest,0)
+
+	for _,req := range requests{
+		if req.Status == "pending"{
+			pendingRequests = append(pendingRequests, req)
+		}
+	}
+
+	return pendingRequests,nil
 }

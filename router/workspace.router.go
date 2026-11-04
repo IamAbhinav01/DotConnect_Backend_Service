@@ -28,4 +28,5 @@ func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware,middlewares.InvitationCreation).Post("/{slug}/invites",ws.WorkspaceController.CreateInvite)
 	r.With(middlewares.AuthMiddleware).Get("/invites/{code}",ws.WorkspaceController.InvitePreview)
 	r.With(middlewares.AuthMiddleware).Post("/invites/{code}/request",ws.WorkspaceController.JoinWorkspaceRequest)
+	r.With(middlewares.AuthMiddleware).Get("/{slug}/request",ws.WorkspaceController.GetAllPendingRequests)
 }

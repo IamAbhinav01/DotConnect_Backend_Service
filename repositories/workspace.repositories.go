@@ -25,7 +25,7 @@ type WorkspaceRepository interface {
 	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
 	CreateJoinRequest(ctx context.Context,slug string,req *schemas.JoinRequest) error
 	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
-	// GetJoinRequests()
+	
 	// ApproveJoinRequest()
 	// RejectJoinRequest()
 	// UpdateWorkspace()
