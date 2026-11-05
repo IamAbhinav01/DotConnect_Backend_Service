@@ -24,9 +24,10 @@ type WorkspaceRepository interface {
 	CreateInvite(ctx context.Context,slug string,invite schemas.WorkspaceInvite) error
 	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
 	CreateJoinRequest(ctx context.Context,slug string,req *schemas.JoinRequest) error
-	// CreateJoinRequest()
-	// GetJoinRequests()
-	// ApproveJoinRequest()
+	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
+	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
+	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
+	
 	// RejectJoinRequest()
 	// UpdateWorkspace()
 	// RemoveMemberFromWorkspace()
@@ -223,4 +224,106 @@ func (repo *WorkspaceRepositoryImpl) CreateJoinRequest(ctx context.Context,slug 
 		return fmt.Errorf("No workspace found")
 	}
 	return nil
+}
+
+func (repo *WorkspaceRepositoryImpl) GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error){
+	
+	var ws *schemas.WorkSpace
+	filter:=bson.M{"slug":slug}
+	err := repo.db.FindOne(ctx,filter).Decode(&ws)
+	if err != nil{
+		return nil,fmt.Errorf("No workspace found")
+	}
+	return ws.JoinRequests,nil
+}
+
+func (repo *WorkspaceRepositoryImpl)ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error){
+
+	var ws schemas.WorkSpace
+	var invitationLink *schemas.WorkspaceInvite
+
+
+	filter := bson.M{"slug":slug}
+
+	err:= repo.db.FindOne(ctx,filter).Decode(&ws)
+	if err != nil{
+		return "",fmt.Errorf("workspace not found %w",err)
+	}
+
+	for _,invitation := range ws.Invites{
+		if invitation.Code == inviteCode{
+			invitationLink = &invitation
+			break
+		}
+	}
+
+	if invitationLink == nil{
+		return "",fmt.Errorf("linked invite not found",)
+	}
+
+	if invitationLink.ApprovedCount >= invitationLink.MaxApprovedJoins{
+		return "", fmt.Errorf("invite limit reached (%d/%d approved joins). Create a new invite",invitationLink.ApprovedCount, invitationLink.MaxApprovedJoins)
+	}
+
+	if time.Now().After(invitationLink.ExpiresAt){
+		return "",fmt.Errorf("cannot approve: the invite link used has expired")
+	}
+
+	filter=bson.M{
+		"slug":             slug,
+		"joinRequests._id": requestID,
+		"invites.code":     inviteCode,
+	}
+
+	update:=bson.M{
+		"$addToSet": bson.M{"members": member},
+		"$inc":      bson.M{"invites.$.approvedCount": 1},
+		"$set": bson.M{
+			"joinRequests.$[req].status":     "approved",
+			"joinRequests.$[req].reviewedAt": time.Now(),
+			"joinRequests.$[req].reviewedBy": reviewerId,
+			"updatedAt":                      time.Now(),
+		},
+	}
+
+	opts := options.UpdateOne().SetArrayFilters([]interface{}{bson.M{"req._id": requestID}})
+
+	result,err:=repo.db.UpdateOne(ctx,filter,update,opts)
+	if err != nil{
+		return "",fmt.Errorf("error approving join request: %w",err)
+	}
+	if result.MatchedCount == 0 {
+		return "",fmt.Errorf("request or workspace not found")
+	}
+	return "Approved the user to the workspace",nil
+}
+
+func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error){
+
+
+	filter:=bson.M{
+		"slug":             slug,
+		"joinRequests._id": requestID,
+		"invites.code":     inviteCode,
+	}
+
+	update:=bson.M{
+		"$set": bson.M{
+			"joinRequests.$[req].status":     "rejected",
+			"joinRequests.$[req].reviewedAt": time.Now(),
+			"joinRequests.$[req].reviewedBy": reviewerId,
+			"updatedAt":                      time.Now(),
+		},
+	}
+
+	
+
+	result,err:=repo.db.UpdateOne(ctx,filter,update)
+	if err != nil{
+		return "",fmt.Errorf("error rejecting join request: %w",err)
+	}
+	if result.MatchedCount == 0 {
+		return "",fmt.Errorf("request or workspace not found")
+	}
+	return "Rejected the user to the workspace",nil
 }

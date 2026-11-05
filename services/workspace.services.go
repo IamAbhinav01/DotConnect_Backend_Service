@@ -25,6 +25,9 @@ type WorkspaceService interface {
 	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
 	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
 	CreateJoinRequest(ctx context.Context,code string,userId string) error
+	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
+	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
+
 }
 
 type WorkspaceServiceImpl struct {
@@ -337,9 +340,11 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 	}
 
 	alreadyRequest := "none"
-	// for _,_ := range ws.JoinRequests{
-	// 	if 
-	// }
+	for _,req := range ws.JoinRequests{
+		if req.UserID == userId && req.InviteCode == code{
+			alreadyRequest = req.Status
+		}
+	}
 
 
 	return &dto.InvitePreviewDTO{
@@ -359,13 +364,29 @@ func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,use
 
 func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,userId string) error{
 
+	ws,invite,err := s.repo.GetInviteByCode(ctx,code)
 
-	//expiry time check
-	//member alreay present check
-	//maximum count check 
-	//doesnot have a pending request
+	slug := ws.Slug
 
+	if time.Now().After( invite.ExpiresAt){
+		return  fmt.Errorf("This invite link has expired")
+	} 
 
+	if invite.ApprovedCount >= invite.MaxApprovedJoins{
+		return fmt.Errorf("this invite has reached its maximum approved join limit")
+	}
+
+	for _,member := range ws.Members{
+		if member.UserID == userId{
+			return fmt.Errorf("you are already a member of this workspace")
+		}
+	}
+	
+	for _,req := range ws.JoinRequests{
+		if req.Status == "pending" && req.UserID == userId{
+			return fmt.Errorf("you already have a pending join request for this workspace")
+		}
+	}
 
 	joinReq := &schemas.JoinRequest{
 		ID: bson.NewObjectID(),
@@ -376,9 +397,100 @@ func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,u
 		CreatedAt: time.Now(),
 	}
 
-	err := s.repo.CreateJoinRequest(ctx,/*needed to setup this*/,joinReq)
+
+	err = s.repo.CreateJoinRequest(ctx,slug,joinReq)
 	if err!= nil{
 		return fmt.Errorf("error occured while sending joining to the workspace %w",err)
 	}
 	return nil
+}
+
+func(s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error){
+	
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		
+		return nil,fmt.Errorf("Unable to fetch the workspace")
+	}
+
+	isAuthorised := false;
+	for _,mem:= range  ws.Members{
+		if mem.UserID == requesterId && (mem.Role == constants.ROLE_ADMIN || mem.Role == constants.ROLE_OWNER){
+			isAuthorised = true
+			break
+		}
+	}
+	if !isAuthorised{
+		
+		return nil,fmt.Errorf("User is not having the required permission to see the list of requests")
+	}
+	
+	requests,err := s.repo.GetJoinRequest(ctx,slug)
+	if err != nil{
+	
+		return nil,fmt.Errorf("Error occured while fetching all the invitations.")
+	}
+
+	pendingRequests := make([]schemas.JoinRequest,0)
+
+	for _,req := range requests{
+		if req.Status == "pending"{
+			pendingRequests = append(pendingRequests, req)
+		}
+	}
+
+	return pendingRequests,nil
+}
+
+func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string)(string,error){
+
+	ws,err:=s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return "",fmt.Errorf("No workspace found")
+	}
+
+	//userinte permission check cheyanam
+	is_auth:=false
+	for _,member := range ws.Members{
+		if member.UserID == requestId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+			is_auth = true
+			break
+		}
+	}
+
+	if !is_auth{
+		return "",fmt.Errorf("User is not having the permision to approve this user. please ask for admin for approving the request")
+	}
+
+	reqId,err := bson.ObjectIDFromHex(requestId)
+	if err!=nil{
+		return "",fmt.Errorf("No request found for this id")
+	}
+
+	var joinRequest *schemas.JoinRequest
+	for _,req := range ws.JoinRequests{
+		if req.ID == reqId{
+			joinRequest = &req
+			break
+		}
+	}
+
+	if joinRequest == nil{
+		return "",fmt.Errorf("No request found")
+	}
+
+	if joinRequest.Status != "pending" {
+		return "",fmt.Errorf("the request is already %s",joinRequest.Status)
+	}
+
+	member := schemas.WorkspaceMember{
+		UserID: joinRequest.UserID,
+		AvatarURL: joinRequest.AvatarURL,
+		Role: constants.ROLE_MEMBER,
+		JoinedAt: time.Now(),
+	}
+
+	response,err := s.repo.ApproveRequest(ctx,slug,joinRequest.InviteCode,member,reqId,requestId)
+
+	return response, nil
 }
