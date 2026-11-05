@@ -25,8 +25,8 @@ type WorkspaceRepository interface {
 	GetInviteByCode(ctx context.Context,code string)(*schemas.WorkSpace, *schemas.WorkspaceInvite, error)
 	CreateJoinRequest(ctx context.Context,slug string,req *schemas.JoinRequest) error
 	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
-	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID string,reviewerId string)(string,error)
-	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID string,reviewerId string)(string,error)
+	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
+	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
 	
 	// RejectJoinRequest()
 	// UpdateWorkspace()
@@ -237,7 +237,7 @@ func (repo *WorkspaceRepositoryImpl) GetJoinRequest(ctx context.Context,slug str
 	return ws.JoinRequests,nil
 }
 
-func (repo *WorkspaceRepositoryImpl)ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID string,reviewerId string)(string,error){
+func (repo *WorkspaceRepositoryImpl)ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error){
 
 	var ws schemas.WorkSpace
 	var invitationLink *schemas.WorkspaceInvite
@@ -298,7 +298,7 @@ func (repo *WorkspaceRepositoryImpl)ApproveRequest(ctx context.Context,slug stri
 	return "Approved the user to the workspace",nil
 }
 
-func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug string,inviteCode string,requestID string,reviewerId string)(string,error){
+func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error){
 
 
 	filter:=bson.M{
