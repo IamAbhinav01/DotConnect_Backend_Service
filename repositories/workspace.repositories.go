@@ -265,9 +265,9 @@ func (repo *WorkspaceRepositoryImpl)ApproveRequest(ctx context.Context,slug stri
 		return "", fmt.Errorf("invite limit reached (%d/%d approved joins). Create a new invite",invitationLink.ApprovedCount, invitationLink.MaxApprovedJoins)
 	}
 
-	if time.Now().After(invitationLink.ExpiresAt){
-		return "",fmt.Errorf("cannot approve: the invite link used has expired")
-	}
+	// if time.Now().After(invitationLink.ExpiresAt){
+	// 	return "",fmt.Errorf("cannot approve: the invite link used has expired")
+	// }
 
 	filter=bson.M{
 		"slug":             slug,
