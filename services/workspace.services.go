@@ -452,7 +452,7 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	//userinte permission check cheyanam
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requestId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
 			is_auth = true
 			break
 		}
@@ -491,6 +491,8 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	}
 
 	response,err := s.repo.ApproveRequest(ctx,slug,joinRequest.InviteCode,member,reqId,requestId)
-
+	if err != nil {
+		return "", err
+	}
 	return response, nil
 }

@@ -298,3 +298,28 @@ func (cntrl *WorkspaceController) GetAllPendingRequests(w http.ResponseWriter, r
     }
     response.SucessResponse(w, http.StatusOK, "Pending requests fetched", requests)
 }
+
+func (cntrl *WorkspaceController) ApproveJoinRequest(w http.ResponseWriter,r *http.Request){
+	slug := chi.URLParam(r, "slug")
+	reqId := chi.URLParam(r,"requestId")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace code is required", nil)
+		return
+	}
+	if reqId == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "request id is required", nil)
+		return
+	}
+
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+	request,err := cntrl.s.ApproveJoinRequest(r.Context(),slug,userID,reqId)
+	if err != nil{
+		 response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+        return
+	}
+	response.SucessResponse(w, http.StatusOK, "Join request approved", request)
+}
