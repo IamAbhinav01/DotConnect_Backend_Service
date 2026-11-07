@@ -304,7 +304,6 @@ func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug strin
 	filter:=bson.M{
 		"slug":             slug,
 		"joinRequests._id": requestID,
-		"invites.code":     inviteCode,
 	}
 
 	update:=bson.M{
@@ -316,9 +315,9 @@ func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug strin
 		},
 	}
 
-	
+	opts := options.UpdateOne().SetArrayFilters([]interface{}{bson.M{"req._id": requestID}})
 
-	result,err:=repo.db.UpdateOne(ctx,filter,update)
+	result,err:=repo.db.UpdateOne(ctx,filter,update,opts)
 	if err != nil{
 		return "",fmt.Errorf("error rejecting join request: %w",err)
 	}
