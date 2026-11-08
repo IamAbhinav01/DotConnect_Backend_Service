@@ -22,11 +22,12 @@ type WorkspaceService interface {
 	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
 	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
 	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
-	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) error
+	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) (*schemas.WorkspaceInvite, error)
 	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
 	CreateJoinRequest(ctx context.Context,code string,userId string) error
 	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
 	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
+	RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
 
 }
 
@@ -275,11 +276,11 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 
 }
 
-func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO)error{
+func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO)(*schemas.WorkspaceInvite, error){
 
 	ws,err := s.repo.GetSlug(ctx,slug)
 	if err != nil{
-		return fmt.Errorf("workspace not found")
+		return nil, fmt.Errorf("workspace not found")
 	}
 
 	var requesterMember *schemas.WorkspaceMember
@@ -289,8 +290,8 @@ func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,reques
 			break
 		}
 	}
-	if (requesterMember.Role == "") || (requesterMember.Role == constants.ROLE_MEMBER){
-		return fmt.Errorf("forbidden: only owners and admins can create invites")
+	if (requesterMember == nil) || (requesterMember.Role == "") || (requesterMember.Role == constants.ROLE_MEMBER){
+		return nil, fmt.Errorf("forbidden: only owners and admins can create invites")
 	}else{
 		maxJoins:=dto.MaxApprovedJoins
 		if maxJoins <= 0{
@@ -314,10 +315,10 @@ func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,reques
 
 		err := s.repo.CreateInvite(ctx,slug,invitation)
 		if err != nil{
-			return  fmt.Errorf("error occured while creating the invitation : %w",err)
+			return nil, fmt.Errorf("error occured while creating the invitation : %w",err)
 		}
 
-		return nil
+		return &invitation, nil
 	}
 }
 
@@ -384,7 +385,15 @@ func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,u
 	
 	for _,req := range ws.JoinRequests{
 		if req.Status == "pending" && req.UserID == userId{
-			return fmt.Errorf("you already have a pending join request for this workspace")
+			if req.InviteCode == code {
+				return fmt.Errorf("you already have a pending join request for this workspace")
+			}
+			// If existing pending request was on an active invite, notify user
+			for _, inv := range ws.Invites {
+				if inv.Code == req.InviteCode && time.Now().Before(inv.ExpiresAt) && inv.ApprovedCount < inv.MaxApprovedJoins {
+					return fmt.Errorf("you already have a pending join request for this workspace")
+				}
+			}
 		}
 	}
 
@@ -452,7 +461,7 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	//userinte permission check cheyanam
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requestId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
 			is_auth = true
 			break
 		}
@@ -491,6 +500,55 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	}
 
 	response,err := s.repo.ApproveRequest(ctx,slug,joinRequest.InviteCode,member,reqId,requestId)
+	if err != nil {
+		return "", err
+	}
+	return response, nil
+}
 
+func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string)(string,error){
+
+	ws,err:=s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return "",fmt.Errorf("No workspace found")
+	}
+
+	is_auth:=false
+	for _,member := range ws.Members{
+		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+			is_auth = true
+			break
+		}
+	}
+
+	if !is_auth{
+		return "",fmt.Errorf("User is not having the permission to reject this request")
+	}
+
+	reqId,err := bson.ObjectIDFromHex(requestId)
+	if err!=nil{
+		return "",fmt.Errorf("No request found for this id")
+	}
+
+	var joinRequest *schemas.JoinRequest
+	for _,req := range ws.JoinRequests{
+		if req.ID == reqId{
+			joinRequest = &req
+			break
+		}
+	}
+
+	if joinRequest == nil{
+		return "",fmt.Errorf("No request found")
+	}
+
+	if joinRequest.Status != "pending" {
+		return "",fmt.Errorf("the request is already %s",joinRequest.Status)
+	}
+
+	response,err := s.repo.RejectRequest(ctx,slug,joinRequest.InviteCode,reqId,requesterId)
+	if err != nil {
+		return "", err
+	}
 	return response, nil
 }
