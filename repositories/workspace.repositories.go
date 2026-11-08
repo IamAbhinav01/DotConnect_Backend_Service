@@ -27,7 +27,7 @@ type WorkspaceRepository interface {
 	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
 	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
-	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) error
+	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error)
 	// UpdateWorkspace()
 	// RemoveMemberFromWorkspace()
 	// DeleteWorkspace()
@@ -326,7 +326,7 @@ func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug strin
 	return "Rejected the user to the workspace",nil
 }
 
-func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) error{
+func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error){
 	
 	filter:=bson.M{
 		"slug":slug,
@@ -340,12 +340,17 @@ func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug str
 					},
 	}
 
-	result,err:=repo.db.UpdateOne(ctx,filter,update)
+	options:=options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var mWorkspace *schemas.WorkSpace
+
+	err:=repo.db.FindOneAndUpdate(ctx,filter,update,options).Decode(&mWorkspace)
 	if err!=nil{
-		return fmt.Errorf("Error occured in updating the workspace %w",err)
+		if err == mongo.ErrNoDocuments{
+			return nil ,fmt.Errorf("workspace not found")
+		}
+		return nil , fmt.Errorf("Error occured in updating the workspace %w",err)
 	}
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("workspace not found")
-	}
-	return nil
+	
+	return mWorkspace ,nil
 }
