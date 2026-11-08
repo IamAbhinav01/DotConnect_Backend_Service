@@ -27,8 +27,7 @@ type WorkspaceRepository interface {
 	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
 	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
-	
-	// RejectJoinRequest()
+	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) error
 	// UpdateWorkspace()
 	// RemoveMemberFromWorkspace()
 	// DeleteWorkspace()
@@ -325,4 +324,28 @@ func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug strin
 		return "",fmt.Errorf("request or workspace not found")
 	}
 	return "Rejected the user to the workspace",nil
+}
+
+func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) error{
+	
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	update:=bson.M{
+		"$set":bson.M{
+			"name":mData.Name,
+			"description":mData.Description,
+			"updatedAt":time.Now(),
+					},
+	}
+
+	result,err:=repo.db.UpdateOne(ctx,filter,update)
+	if err!=nil{
+		return fmt.Errorf("Error occured in updating the workspace %w",err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("workspace not found")
+	}
+	return nil
 }
