@@ -332,15 +332,19 @@ func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug str
 		"slug":slug,
 	}
 
-	update:=bson.M{
-		"$set":bson.M{
-			"name":mData.Name,
-			"description":mData.Description,
-			"updatedAt":time.Now(),
-					},
+	setFields := bson.M{"updatedAt":time.Now(),}
+	if mData.Name != ""{
+		setFields["name"] = mData.Name
+	}
+	if mData.Description != ""{
+		setFields["description"] = mData.Description
 	}
 
-	options:=options.FindOneAndUpdate().SetReturnDocument(options.After)
+	update:=bson.M{
+		"$set":setFields,
+	}
+
+	options:=options.FindOneAndUpdate().SetReturnDocument(options.After) // it is used so that it will return the updated workspace back
 
 	var mWorkspace *schemas.WorkSpace
 
