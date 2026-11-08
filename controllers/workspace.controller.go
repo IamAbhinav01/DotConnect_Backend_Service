@@ -348,3 +348,34 @@ func (cntrl *WorkspaceController) RejectJoinRequest(w http.ResponseWriter,r *htt
 	}
 	response.SucessResponse(w, http.StatusOK, "Join request rejected", msg)
 }
+
+
+func (cntrl *WorkspaceController) UpdateWorkspace(w http.ResponseWriter, r *http.Request) {
+	
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace code is required", nil)
+		return
+	}
+
+	dtoPayload, ok := r.Context().Value(middlewares.UpdateContextKey).(dto.WorkSpaceUpdationDTO)
+	if !ok {
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid payload in context", nil)
+		return
+	}
+
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+
+	// workspace, err := cntrl.s.CreateWorkspace(r.Context(), userID, dtoPayload)
+	// if err != nil {
+	// 	response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+	// 	return
+	// }
+
+	// response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
+}
