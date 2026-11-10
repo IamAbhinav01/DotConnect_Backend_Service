@@ -33,4 +33,5 @@ func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware).Get("/{slug}/request",ws.WorkspaceController.GetAllPendingRequests)
 	r.With(middlewares.AuthMiddleware).Post("/{slug}/request/{requestId}/approve",ws.WorkspaceController.ApproveJoinRequest)
 	r.With(middlewares.AuthMiddleware).Post("/{slug}/request/{requestId}/reject",ws.WorkspaceController.RejectJoinRequest)
+	r.With(middlewares.AuthMiddleware,middlewares.WorkSpaceUpdation).Post("/{slug}/update",ws.WorkspaceController.UpdateWorkspace)
 }

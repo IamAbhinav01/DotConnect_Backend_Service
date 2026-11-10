@@ -114,7 +114,7 @@ func WorkSpaceUpdation(next http.Handler) http.Handler {
 			}
 
 			reqContext := r.Context()
-			ctx := context.WithValue(reqContext, PayloadContextKey, payload)
+			ctx := context.WithValue(reqContext, UpdateContextKey, payload)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

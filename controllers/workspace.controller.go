@@ -371,11 +371,11 @@ func (cntrl *WorkspaceController) UpdateWorkspace(w http.ResponseWriter, r *http
 		return
 	}
 
-	// workspace, err := cntrl.s.CreateWorkspace(r.Context(), userID, dtoPayload)
-	// if err != nil {
-	// 	response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
-	// 	return
-	// }
+	workspace, err:=cntrl.s.UpdateWorkspace(r.Context(),slug,userID,dtoPayload)
+	if err != nil {
+		response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+		return
+	}
 
-	// response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
+	response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
 }

@@ -28,8 +28,7 @@ type WorkspaceRepository interface {
 	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
 	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error)
-	// UpdateWorkspace()
-	// RemoveMemberFromWorkspace()
+	RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(string ,error)
 	// DeleteWorkspace()
 	
 }
@@ -346,7 +345,7 @@ func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug str
 
 	options:=options.FindOneAndUpdate().SetReturnDocument(options.After) // it is used so that it will return the updated workspace back
 
-	var mWorkspace *schemas.WorkSpace
+	var mWorkspace schemas.WorkSpace
 
 	err:=repo.db.FindOneAndUpdate(ctx,filter,update,options).Decode(&mWorkspace)
 	if err!=nil{
@@ -356,5 +355,14 @@ func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug str
 		return nil , fmt.Errorf("Error occured in updating the workspace %w",err)
 	}
 	
-	return mWorkspace ,nil
+	return &mWorkspace ,nil
+}
+
+func(repo *WorkspaceRepositoryImpl) RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(string ,error){
+
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	
 }

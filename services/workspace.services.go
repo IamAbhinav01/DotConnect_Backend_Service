@@ -28,7 +28,7 @@ type WorkspaceService interface {
 	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
 	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
 	RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
-
+	UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error)
 }
 
 type WorkspaceServiceImpl struct {
@@ -424,7 +424,7 @@ func(s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context,slug string,req
 
 	isAuthorised := false;
 	for _,mem:= range  ws.Members{
-		if mem.UserID == requesterId && (mem.Role == constants.ROLE_ADMIN || mem.Role == constants.ROLE_OWNER){
+		if mem.UserID == requesterId && constants.Is_Manager(mem.Role){
 			isAuthorised = true
 			break
 		}
@@ -461,7 +461,7 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	//userinte permission check cheyanam
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && constants.Is_Manager(member.Role){
 			is_auth = true
 			break
 		}
@@ -515,7 +515,7 @@ func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string
 
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && constants.Is_Manager(member.Role){
 			is_auth = true
 			break
 		}
@@ -551,4 +551,43 @@ func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string
 		return "", err
 	}
 	return response, nil
+}
+
+func(s *WorkspaceServiceImpl) UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error){
+	
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return nil,fmt.Errorf("Error occured , no workspace found %w",err)
+	}
+
+	is_auth := false
+	for _,member := range ws.Members{
+		if(requesterId == member.UserID && constants.Is_Manager(member.Role)){
+			is_auth = true
+			break
+		}
+	}
+	if !is_auth{
+		return nil,fmt.Errorf("forbidden: only owners and admins can update this workspace")
+	}
+
+	name := strings.TrimSpace(dto.Name)
+	description := dto.Description
+	
+	modifiedws := &schemas.WorkSpace{}
+	
+	if name != ""{
+		modifiedws.Name = name
+	}
+	if description != ""{
+		modifiedws.Description = description
+	}
+
+	
+	updatedWorkspace,err:=s.repo.UpdateWorkspace(ctx,slug,modifiedws)
+	if err!=nil{
+		return nil,fmt.Errorf("Error occured while updating the workspace")
+	}
+
+	return updatedWorkspace,nil
 }
