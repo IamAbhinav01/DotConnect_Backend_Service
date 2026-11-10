@@ -28,7 +28,7 @@ type WorkspaceRepository interface {
 	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
 	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error)
-	RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(string ,error)
+	RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(bool ,error)
 	// DeleteWorkspace()
 	
 }
@@ -358,11 +358,36 @@ func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug str
 	return &mWorkspace ,nil
 }
 
-func(repo *WorkspaceRepositoryImpl) RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(string ,error){
+func(repo *WorkspaceRepositoryImpl) RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(bool ,error){
 
 	filter:=bson.M{
 		"slug":slug,
 	}
 
-	
+	update:=bson.M{
+		"$pull":bson.M{
+
+			"members":bson.M{
+				"userId":memberId,
+			},
+		},
+		"$set": bson.M{
+        	"updatedAt": time.Now(),
+    	},
+	}
+	result,err := repo.db.UpdateOne(ctx,filter,update)
+	if err != nil{
+		return false,fmt.Errorf("error removing  member: %w",err)
+	}
+
+	if result.MatchedCount == 0{
+		return false,fmt.Errorf("workspace not found")
+	}
+	if result.ModifiedCount == 0 {
+		return false, fmt.Errorf("user is not a member of this workspace")
+	}
+
+	return true,nil
+
 }
+
