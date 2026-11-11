@@ -24,6 +24,11 @@ type AddMemberDTO struct{
     Role   string `json:"role"   validate:"required,oneof=admin member"`
 }
 
+type RemoveMemberDTO struct{
+	UserID string `json:"userId" validate:"required"`
+	Role   string `json:"role"   validate:"omitempty,oneof=admin member owner"`
+}
+
 type WorkSpaceResponseDTO struct {
 	ID          bson.ObjectID     `json:"id"`
 	Name        string            `json:"name"`

@@ -61,6 +61,30 @@ func AddMemberValidation(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 }
+var RemoveMemberContextKey contextKey = "removememberContextKey"
+func RemoveMemberValidation(next http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+
+			var payload dto.RemoveMemberDTO
+
+			err := json.DecodeFromJSON(r, &payload)
+			if err != nil {
+				response.ErrorResponse(w, http.StatusBadRequest, "Error occured while decoding the json", err)
+				return
+			}
+			validationErr := validator.Validate.Struct(payload)
+			if validationErr != nil {
+				response.ErrorResponse(w, http.StatusBadRequest, "Invalid Bad Request Payload", validationErr)
+				return
+			}
+
+			reqContext := r.Context()
+			ctx := context.WithValue(reqContext, RemoveMemberContextKey, payload)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+}
 
 var CreateInvitationContextKey = "createInvitationContextKey"
 

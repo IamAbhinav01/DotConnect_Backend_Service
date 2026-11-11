@@ -43,7 +43,7 @@ func (cntrl *WorkspaceController) CreateWorkspace(w http.ResponseWriter, r *http
 		return
 	}
 
-	response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
+	response.SucessResponse(w, http.StatusOK, "Workspace updated successfully", workspace)
 }
 
 
@@ -377,5 +377,69 @@ func (cntrl *WorkspaceController) UpdateWorkspace(w http.ResponseWriter, r *http
 		return
 	}
 
-	response.SucessResponse(w, http.StatusCreated, "Workspace created successfully", workspace)
+	response.SucessResponse(w, http.StatusOK, "Workspace updated successfully", workspace)
+}
+
+
+func (cntrl *WorkspaceController) RemoveMemberFromWorkspace(w http.ResponseWriter, r *http.Request){
+
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace slug is required", nil)
+		return
+	}
+
+	dtoPayload, ok := r.Context().Value(middlewares.RemoveMemberContextKey).(dto.RemoveMemberDTO)
+	if !ok {
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid payload in context", nil)
+		return
+	}
+
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+
+	_, err := cntrl.s.RemoveMemberFromWorkspace(r.Context(), slug,userID, dtoPayload)
+	if err != nil {
+		if err.Error() == "forbidden: only owners and admins can remove members" {
+			response.ErrorResponse(w, http.StatusForbidden, err.Error(), err)
+			return
+		}
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
+	response.SucessResponse(w, http.StatusOK, "Member removed from workspace successfully", nil)
+}
+
+
+func (cntrl *WorkspaceController) RemoveWorkspace(w http.ResponseWriter, r *http.Request){
+
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace slug is required", nil)
+		return
+	}
+
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+
+	_, err := cntrl.s.DeleteWorkspace(r.Context(), slug,userID)
+	if err != nil {
+		if err.Error() == "forbidden: only owners can remove workspaace" {
+			response.ErrorResponse(w, http.StatusForbidden, err.Error(), err)
+			return
+		}
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
+	response.SucessResponse(w, http.StatusCreated, "workspaace removed successfully", nil)
 }

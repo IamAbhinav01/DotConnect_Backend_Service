@@ -29,7 +29,7 @@ type WorkspaceRepository interface {
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
 	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error)
 	RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(bool ,error)
-	// DeleteWorkspace()
+	DeleteWorkspace(ctx context.Context,slug string)(bool,error)
 	
 }
 
@@ -391,3 +391,19 @@ func(repo *WorkspaceRepositoryImpl) RemoveMemberFromWorkspace(ctx context.Contex
 
 }
 
+func(repo *WorkspaceRepositoryImpl)DeleteWorkspace(ctx context.Context,slug string )(bool,error){
+	
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	result,err := repo.db.DeleteOne(ctx,filter)
+	if err!=nil{
+		return false,fmt.Errorf("Error occured while deleting the workspaace %w",err)
+	}
+	if result.DeletedCount == 0{
+		return false,fmt.Errorf("No workspae is present with this id to delete")
+	}
+
+	return true,nil
+}

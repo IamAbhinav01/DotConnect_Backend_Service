@@ -34,4 +34,8 @@ func (ws *WorkspaceRouter) Register(r chi.Router) {
 	r.With(middlewares.AuthMiddleware).Post("/{slug}/request/{requestId}/approve",ws.WorkspaceController.ApproveJoinRequest)
 	r.With(middlewares.AuthMiddleware).Post("/{slug}/request/{requestId}/reject",ws.WorkspaceController.RejectJoinRequest)
 	r.With(middlewares.AuthMiddleware,middlewares.WorkSpaceUpdation).Post("/{slug}/update",ws.WorkspaceController.UpdateWorkspace)
+	r.With(middlewares.AuthMiddleware, middlewares.RemoveMemberValidation).Delete("/{slug}/removeMember", ws.WorkspaceController.RemoveMemberFromWorkspace)
+	r.With(middlewares.AuthMiddleware, middlewares.RemoveMemberValidation).Post("/{slug}/removeMember", ws.WorkspaceController.RemoveMemberFromWorkspace)
+	r.With(middlewares.AuthMiddleware).Delete("/{slug}/removeWorkspace", ws.WorkspaceController.RemoveWorkspace)
+	r.With(middlewares.AuthMiddleware).Post("/{slug}/removeWorkspace", ws.WorkspaceController.RemoveWorkspace)
 }

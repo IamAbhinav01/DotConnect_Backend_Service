@@ -29,8 +29,10 @@ type WorkspaceService interface {
 	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
 	RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
 	UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error)
-	RemoveMemberFromWorkspace(ctx context.Context,slug string,requesterId string,targetUserId string)(bool,error)
-}
+	RemoveMemberFromWorkspace(ctx context.Context,slug string,requesterId string,targetUser dto.RemoveMemberDTO)(bool,error)
+	DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error)
+
+}	
 
 type WorkspaceServiceImpl struct {
 	repo repositories.WorkspaceRepository
@@ -593,69 +595,106 @@ func(s *WorkspaceServiceImpl) UpdateWorkspace(ctx context.Context,slug string,re
 	return updatedWorkspace,nil
 }
 
-func(s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context,slug string,requesterId string,targetUserId string)(bool,error){
-	
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err!=nil{
-		return false,fmt.Errorf("Error occured while fetching workspace %w",err)
+func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, slug string, requesterId string, targetUser dto.RemoveMemberDTO) (bool, error) {
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("error fetching workspace: %w", err)
 	}
 
+	memberPayload:=schemas.WorkspaceMember{
+		UserID: targetUser.UserID,
+		JoinedAt: time.Now(),
+	}
 
-	
 	var requesterSchema *schemas.WorkspaceMember
 	var targetSchema *schemas.WorkspaceMember
 
-	// populate the schema
-	for i := range ws.Members{
-		if ws.Members[i].UserID == requesterId{
-			requesterSchema = &ws.Members[i];
+	// Populate the schemas
+	for i := range ws.Members {
+		if ws.Members[i].UserID == requesterId {
+			requesterSchema = &ws.Members[i]
 		}
-		if ws.Members[i].UserID == targetUserId{
-			targetSchema = &ws.Members[i];
-		}
-	}
-
-	// noe i need to cjeck if there is any value there.
-	if requesterSchema == nil{
-		return  false,fmt.Errorf("The requesting user is not in the workspace")
-	}
-	if targetSchema == nil{
-		return  false,fmt.Errorf("The targetting user is not in the workspace")
-	}
-
-	// admins can never be removed by another admin.
-	if targetSchema.Role == constants.ROLE_ADMIN && requesterSchema.Role == constants.ROLE_ADMIN{
-		return false,fmt.Errorf("bad request: the workspace admin cannot be removed by another admin")
-	}
-	//owners can remove the admin
-	if requesterSchema.Role == constants.ROLE_OWNER && (targetSchema.Role == constants.ROLE_ADMIN || targetSchema.Role == constants.ROLE_MEMBER){
-		return false,fmt.Errorf("bad request: the workspace owner cannot be removed")
-	}
-	
-	//no admin or owner then no removl
-	if(!constants.Is_Manager(requesterSchema.Role)){
-		return false,fmt.Errorf("forbidden: only owners and admins can remove members")
-	}
-
-	//voluntary exit ,  but not owneer
-	if(targetUserId == requesterId && requesterSchema.Role != constants.ROLE_OWNER){
-		ok,err:=s.repo.RemoveMemberFromWorkspace(ctx,slug,targetUserId)
-		if !ok{
-			return false,fmt.Errorf("unable to remove the targetUser")
-		}
-		if err!=nil{
-			return false,fmt.Errorf("error occured while removing the user %w",err)
+		if ws.Members[i].UserID == memberPayload.UserID {
+			targetSchema = &ws.Members[i]
 		}
 	}
 
-	ok,err := s.repo.RemoveMemberFromWorkspace(ctx,slug,targetUserId)
-	if !ok{
-		return false,fmt.Errorf("unable to remove the targetUser")
+	// Verify both exist in workspace
+	if requesterSchema == nil {
+		return false, fmt.Errorf("forbidden: requesting user is not in the workspace")
 	}
-	if err!=nil{
-		return false,fmt.Errorf("error occured while removing the user %w",err)
+	if targetSchema == nil {
+		return false, fmt.Errorf("bad request: target user is not in the workspace")
 	}
-	
+
+	// Rule 1: The workspace owner can NEVER be removed (by anyone or themselves)
+	if targetSchema.Role == constants.ROLE_OWNER {
+		return false, fmt.Errorf("bad request: the workspace owner cannot be removed")
+	}
+
+	// Rule 2: Case A — Voluntary exit ("Leave Workspace")
+	if requesterId == memberPayload.UserID {
+		ok, err := s.repo.RemoveMemberFromWorkspace(ctx, slug, memberPayload.UserID)
+		if err != nil {
+			return false, fmt.Errorf("error leaving workspace: %w", err)
+		}
+		if !ok {
+			return false, fmt.Errorf("unable to leave workspace")
+		}
+		return true, nil 
+	}
+
+	// Rule 3: Case B — Kicking someone else (requesterId != targetUserId)
+	// Must be an admin or owner to kick
+	if !constants.Is_Manager(requesterSchema.Role) {
+		return false, fmt.Errorf("forbidden: only owners and admins can remove members")
+	}
+
+	// Admins cannot remove other admins. Only the owner can remove an admin.
+	if targetSchema.Role == constants.ROLE_ADMIN && requesterSchema.Role == constants.ROLE_ADMIN {
+		return false, fmt.Errorf("forbidden: admins cannot remove other admins. Only the owner can")
+	}
+
+	// Execute removal
+	ok, err := s.repo.RemoveMemberFromWorkspace(ctx, slug, memberPayload.UserID)
+	if err != nil {
+		return false, fmt.Errorf("error removing member: %w", err)
+	}
+	if !ok {
+		return false, fmt.Errorf("unable to remove the target user")
+	}
+
+	return true, nil
+}
+
+func (s *WorkspaceServiceImpl) DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error){
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err!= nil{
+		return false,fmt.Errorf("Error occured while fetching the workspace %w",err)
+	}
+
+	is_auth := false
+
+	for _,member:= range ws.Members{
+		if member.UserID == requesterId && member.Role == constants.ROLE_OWNER{
+			is_auth = true
+			break
+		}
+	}
+
+	if !is_auth{
+		return false,fmt.Errorf("forbidden: only owners can delete workspace")
+	}
+
+	ok,err := s.repo.DeleteWorkspace(ctx,slug)
+	if err!= nil{
+		return false,fmt.Errorf("Error occured while removing the workspaace %w",err)
+	}
+
+	if(!ok){
+		return false,err
+	}
+
 	return true,nil
 
 }
