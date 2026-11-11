@@ -27,11 +27,9 @@ type WorkspaceRepository interface {
 	GetJoinRequest(ctx context.Context,slug string) ([] schemas.JoinRequest,error)
 	ApproveRequest(ctx context.Context,slug string,inviteCode string,member schemas.WorkspaceMember,requestID bson.ObjectID,reviewerId string)(string,error)
 	RejectRequest(ctx context.Context,slug string,inviteCode string,requestID bson.ObjectID,reviewerId string)(string,error)
-	
-	// RejectJoinRequest()
-	// UpdateWorkspace()
-	// RemoveMemberFromWorkspace()
-	// DeleteWorkspace()
+	UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error)
+	RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(bool ,error)
+	DeleteWorkspace(ctx context.Context,slug string)(bool,error)
 	
 }
 
@@ -325,4 +323,87 @@ func (repo *WorkspaceRepositoryImpl)RejectRequest(ctx context.Context,slug strin
 		return "",fmt.Errorf("request or workspace not found")
 	}
 	return "Rejected the user to the workspace",nil
+}
+
+func (repo *WorkspaceRepositoryImpl)UpdateWorkspace(ctx context.Context,slug string, mData *schemas.WorkSpace) (*schemas.WorkSpace,error){
+	
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	setFields := bson.M{"updatedAt":time.Now(),}
+	if mData.Name != ""{
+		setFields["name"] = mData.Name
+	}
+	if mData.Description != ""{
+		setFields["description"] = mData.Description
+	}
+
+	update:=bson.M{
+		"$set":setFields,
+	}
+
+	options:=options.FindOneAndUpdate().SetReturnDocument(options.After) // it is used so that it will return the updated workspace back
+
+	var mWorkspace schemas.WorkSpace
+
+	err:=repo.db.FindOneAndUpdate(ctx,filter,update,options).Decode(&mWorkspace)
+	if err!=nil{
+		if err == mongo.ErrNoDocuments{
+			return nil ,fmt.Errorf("workspace not found")
+		}
+		return nil , fmt.Errorf("Error occured in updating the workspace %w",err)
+	}
+	
+	return &mWorkspace ,nil
+}
+
+func(repo *WorkspaceRepositoryImpl) RemoveMemberFromWorkspace(ctx context.Context,slug string,memberId string)(bool ,error){
+
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	update:=bson.M{
+		"$pull":bson.M{
+
+			"members":bson.M{
+				"userId":memberId,
+			},
+		},
+		"$set": bson.M{
+        	"updatedAt": time.Now(),
+    	},
+	}
+	result,err := repo.db.UpdateOne(ctx,filter,update)
+	if err != nil{
+		return false,fmt.Errorf("error removing  member: %w",err)
+	}
+
+	if result.MatchedCount == 0{
+		return false,fmt.Errorf("workspace not found")
+	}
+	if result.ModifiedCount == 0 {
+		return false, fmt.Errorf("user is not a member of this workspace")
+	}
+
+	return true,nil
+
+}
+
+func(repo *WorkspaceRepositoryImpl)DeleteWorkspace(ctx context.Context,slug string )(bool,error){
+	
+	filter:=bson.M{
+		"slug":slug,
+	}
+
+	result,err := repo.db.DeleteOne(ctx,filter)
+	if err!=nil{
+		return false,fmt.Errorf("Error occured while deleting the workspaace %w",err)
+	}
+	if result.DeletedCount == 0{
+		return false,fmt.Errorf("No workspae is present with this id to delete")
+	}
+
+	return true,nil
 }

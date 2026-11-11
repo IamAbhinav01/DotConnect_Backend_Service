@@ -13,10 +13,20 @@ type WorkSpaceCreationDTO struct {
 	Description string `json:"description" validate:"omitempty,max=1000"`
 }
 
+type WorkSpaceUpdationDTO struct {
+	Name        string `json:"name" validate:"omitempty,min=3,max=80,printascii"`
+	Description string `json:"description" validate:"omitempty,max=1000"`
+}
+
 
 type AddMemberDTO struct{
 	UserID string `json:"userId" validate:"required"`
     Role   string `json:"role"   validate:"required,oneof=admin member"`
+}
+
+type RemoveMemberDTO struct{
+	UserID string `json:"userId" validate:"required"`
+	Role   string `json:"role"   validate:"omitempty,oneof=admin member owner"`
 }
 
 type WorkSpaceResponseDTO struct {

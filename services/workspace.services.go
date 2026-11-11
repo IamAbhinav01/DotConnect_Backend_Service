@@ -28,8 +28,11 @@ type WorkspaceService interface {
 	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
 	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
 	RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
+	UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error)
+	RemoveMemberFromWorkspace(ctx context.Context,slug string,requesterId string,targetUser dto.RemoveMemberDTO)(bool,error)
+	DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error)
 
-}
+}	
 
 type WorkspaceServiceImpl struct {
 	repo repositories.WorkspaceRepository
@@ -424,7 +427,7 @@ func(s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context,slug string,req
 
 	isAuthorised := false;
 	for _,mem:= range  ws.Members{
-		if mem.UserID == requesterId && (mem.Role == constants.ROLE_ADMIN || mem.Role == constants.ROLE_OWNER){
+		if mem.UserID == requesterId && constants.Is_Manager(mem.Role){
 			isAuthorised = true
 			break
 		}
@@ -461,7 +464,7 @@ func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug strin
 	//userinte permission check cheyanam
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && constants.Is_Manager(member.Role){
 			is_auth = true
 			break
 		}
@@ -515,7 +518,7 @@ func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string
 
 	is_auth:=false
 	for _,member := range ws.Members{
-		if member.UserID == requesterId && (member.Role == constants.ROLE_ADMIN || member.Role == constants.ROLE_OWNER){
+		if member.UserID == requesterId && constants.Is_Manager(member.Role){
 			is_auth = true
 			break
 		}
@@ -551,4 +554,147 @@ func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string
 		return "", err
 	}
 	return response, nil
+}
+
+func(s *WorkspaceServiceImpl) UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error){
+	
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err != nil{
+		return nil,fmt.Errorf("Error occured , no workspace found %w",err)
+	}
+
+	is_auth := false
+	for _,member := range ws.Members{
+		if(requesterId == member.UserID && constants.Is_Manager(member.Role)){
+			is_auth = true
+			break
+		}
+	}
+	if !is_auth{
+		return nil,fmt.Errorf("forbidden: only owners and admins can update this workspace")
+	}
+
+	name := strings.TrimSpace(dto.Name)
+	description := dto.Description
+	
+	modifiedws := &schemas.WorkSpace{}
+	
+	if name != ""{
+		modifiedws.Name = name
+	}
+	if description != ""{
+		modifiedws.Description = description
+	}
+
+	
+	updatedWorkspace,err:=s.repo.UpdateWorkspace(ctx,slug,modifiedws)
+	if err!=nil{
+		return nil,fmt.Errorf("Error occured while updating the workspace")
+	}
+
+	return updatedWorkspace,nil
+}
+
+func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, slug string, requesterId string, targetUser dto.RemoveMemberDTO) (bool, error) {
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("error fetching workspace: %w", err)
+	}
+
+	memberPayload:=schemas.WorkspaceMember{
+		UserID: targetUser.UserID,
+		JoinedAt: time.Now(),
+	}
+
+	var requesterSchema *schemas.WorkspaceMember
+	var targetSchema *schemas.WorkspaceMember
+
+	// Populate the schemas
+	for i := range ws.Members {
+		if ws.Members[i].UserID == requesterId {
+			requesterSchema = &ws.Members[i]
+		}
+		if ws.Members[i].UserID == memberPayload.UserID {
+			targetSchema = &ws.Members[i]
+		}
+	}
+
+	// Verify both exist in workspace
+	if requesterSchema == nil {
+		return false, fmt.Errorf("forbidden: requesting user is not in the workspace")
+	}
+	if targetSchema == nil {
+		return false, fmt.Errorf("bad request: target user is not in the workspace")
+	}
+
+	// Rule 1: The workspace owner can NEVER be removed (by anyone or themselves)
+	if targetSchema.Role == constants.ROLE_OWNER {
+		return false, fmt.Errorf("bad request: the workspace owner cannot be removed")
+	}
+
+	// Rule 2: Case A — Voluntary exit ("Leave Workspace")
+	if requesterId == memberPayload.UserID {
+		ok, err := s.repo.RemoveMemberFromWorkspace(ctx, slug, memberPayload.UserID)
+		if err != nil {
+			return false, fmt.Errorf("error leaving workspace: %w", err)
+		}
+		if !ok {
+			return false, fmt.Errorf("unable to leave workspace")
+		}
+		return true, nil 
+	}
+
+	// Rule 3: Case B — Kicking someone else (requesterId != targetUserId)
+	// Must be an admin or owner to kick
+	if !constants.Is_Manager(requesterSchema.Role) {
+		return false, fmt.Errorf("forbidden: only owners and admins can remove members")
+	}
+
+	// Admins cannot remove other admins. Only the owner can remove an admin.
+	if targetSchema.Role == constants.ROLE_ADMIN && requesterSchema.Role == constants.ROLE_ADMIN {
+		return false, fmt.Errorf("forbidden: admins cannot remove other admins. Only the owner can")
+	}
+
+	// Execute removal
+	ok, err := s.repo.RemoveMemberFromWorkspace(ctx, slug, memberPayload.UserID)
+	if err != nil {
+		return false, fmt.Errorf("error removing member: %w", err)
+	}
+	if !ok {
+		return false, fmt.Errorf("unable to remove the target user")
+	}
+
+	return true, nil
+}
+
+func (s *WorkspaceServiceImpl) DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error){
+	ws,err := s.repo.GetSlug(ctx,slug)
+	if err!= nil{
+		return false,fmt.Errorf("Error occured while fetching the workspace %w",err)
+	}
+
+	is_auth := false
+
+	for _,member:= range ws.Members{
+		if member.UserID == requesterId && member.Role == constants.ROLE_OWNER{
+			is_auth = true
+			break
+		}
+	}
+
+	if !is_auth{
+		return false,fmt.Errorf("forbidden: only owners can delete workspace")
+	}
+
+	ok,err := s.repo.DeleteWorkspace(ctx,slug)
+	if err!= nil{
+		return false,fmt.Errorf("Error occured while removing the workspaace %w",err)
+	}
+
+	if(!ok){
+		return false,err
+	}
+
+	return true,nil
+
 }
