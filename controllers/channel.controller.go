@@ -1,0 +1,53 @@
+package controllers
+
+import (
+	"DotConnect/dto"
+	"DotConnect/middlewares"
+	"DotConnect/services"
+	"DotConnect/utils/response"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+type ChannelController struct {
+	serv services.ChannelService
+}
+
+func NewChannelController(_s services.ChannelService)* ChannelController{ 
+	return &ChannelController{
+		serv: _s,
+	}
+}
+
+
+func (cntrl *ChannelController) CreateChannel(w http.ResponseWriter, r *http.Request) {
+	
+
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.ErrorResponse(w, http.StatusBadRequest, "Workspace slug is required", nil)
+		return
+	}
+
+	dtoPayload, ok := r.Context().Value(middlewares.ChannelContextKey).(dto.ChannelCreationDTO)
+	if !ok {
+		response.ErrorResponse(w, http.StatusBadRequest, "Invalid payload in context", nil)
+		return
+	}
+
+	// Get authenticated userID from context (set by AuthMiddleware)
+	userID, ok := r.Context().Value(middlewares.UserIDKey).(string)
+	if !ok || userID == "" {
+		response.ErrorResponse(w, http.StatusUnauthorized, "Unauthorized: user ID missing", nil)
+		return
+	}
+
+	channel, err := cntrl.serv.CreateChannel(r.Context(), userID,slug ,dtoPayload)
+	if err != nil {
+		response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+		return
+	}
+
+	response.SucessResponse(w, http.StatusOK, "Channel updated successfully", channel)
+}
