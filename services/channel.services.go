@@ -13,6 +13,7 @@ import (
 
 type ChannelService interface {
 	CreateChannel(ctx context.Context, ownerID string, slug string, channelCreationDTO dto.ChannelCreationDTO) (*schemas.Channel, error)
+	GetAllChannels(ctx context.Context,userId string,slug string)([]schemas.Channel,error)
 }
 
 type ChannelServiceImpl struct {
@@ -79,4 +80,8 @@ func (s *ChannelServiceImpl) CreateChannel(ctx context.Context, ownerID string, 
 		return nil, fmt.Errorf("create channel: %w", err)
 	}
 	return createdChannel, nil
+}
+
+func (s *ChannelServiceImpl) GetAllChannels(ctx context.Context,userId string,slug string)([]schemas.Channel,error){
+	
 }
