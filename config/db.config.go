@@ -15,12 +15,14 @@ var (
 	Client *mongo.Client
 	Db *mongo.Database
 	DotConnect *mongo.Collection
+	Channels *mongo.Collection
 )
 
 func ConnectToDB() error{
 	MONGODB_URI := GetString("MONGODB_URI")
 	DB_NAME := GetString("DB_NAME")
 	DOTCONNECT_COLLECTION := GetString("DOTCONNECT_COLLECTION")
+	DOTCONNECT_CHANNEL_COLLECTION := GetString("DOTCONNECT_CHANNEL_COLLECTION")
 
 	if MONGODB_URI == ""{
 		return fmt.Errorf("Error occured while decoding the MONGODB URI")
@@ -46,6 +48,8 @@ func ConnectToDB() error{
 	Client = mongoClient
 	Db = mongoClient.Database(DB_NAME)
 	DotConnect = Db.Collection(DOTCONNECT_COLLECTION)
+	Channels = Db.Collection(DOTCONNECT_CHANNEL_COLLECTION)
+	
 	if err := ensureIndexes(ctx); err != nil {
 		return fmt.Errorf("failed to create indexes: %w", err)
 	}

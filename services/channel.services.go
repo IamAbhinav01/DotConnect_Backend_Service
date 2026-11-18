@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type ChannelService interface {
@@ -48,11 +49,29 @@ func (s *ChannelServiceImpl) CreateChannel(ctx context.Context, ownerID string, 
 		return nil,fmt.Errorf("forbidden: only owners and admins can create channel")
 	}
 
+
+	exists,err:=s.repo.DuplicateChannelChecker(ctx,name,workspace.ID)
+	if err!=nil{
+		return nil,err
+	}
+
+	if exists {
+    	return nil, fmt.Errorf("channel with name %q already exists in this workspace", name)
+	}
+
 	channel := &schemas.Channel{
 		WorkspaceID: workspace.ID,
 		Name:        name,
 		Public:      channelCreationDTO.Public,
 		CreatedBy:   ownerID,
+		Members: []schemas.ChannelMember{
+			{
+				UserID: ownerID,
+				Role: constants.ROLE_ADMIN,
+				AvatarURL:  "/api/v1/users/" + ownerID + "/avatar",
+				JoinedAt: time.Now(),
+			},
+		},
 	}
 
 	createdChannel, err := s.repo.CreateChannel(ctx, channel)

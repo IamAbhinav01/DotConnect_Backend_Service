@@ -12,6 +12,7 @@ import (
 
 type ChannelRepository interface {
 	CreateChannel(ctx context.Context,channelPayload *schemas.Channel) (*schemas.Channel, error)
+	DuplicateChannelChecker(ctx context.Context,channelName string,workspaceId bson.ObjectID) (bool,error)
 }
 
 type ChannelRepositoryImpl struct{
@@ -35,4 +36,17 @@ func(repo *ChannelRepositoryImpl) CreateChannel(ctx context.Context,channelPaylo
 	}
 
 	return channelPayload,nil
+}
+
+func(repo *ChannelRepositoryImpl)DuplicateChannelChecker(ctx context.Context,channelName string,workspaceId bson.ObjectID) (bool,error){
+	
+	filter:=bson.M{
+		"workspaceId":workspaceId,
+		"name":channelName,
+	}
+	count,err := repo.db.CountDocuments(ctx,filter)
+	if err != nil{
+		return false,err
+	}
+	return count>0,err
 }

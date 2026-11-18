@@ -6,6 +6,7 @@ import (
 	"DotConnect/services"
 	"DotConnect/utils/response"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -45,9 +46,13 @@ func (cntrl *ChannelController) CreateChannel(w http.ResponseWriter, r *http.Req
 
 	channel, err := cntrl.serv.CreateChannel(r.Context(), userID,slug ,dtoPayload)
 	if err != nil {
-		response.ErrorResponse(w, http.StatusInternalServerError, err.Error(), err)
+		if strings.HasPrefix(err.Error(), "forbidden") {
+			response.ErrorResponse(w, http.StatusForbidden, err.Error(), err)
+			return
+    	}
+		response.ErrorResponse(w, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
-	response.SucessResponse(w, http.StatusOK, "Channel updated successfully", channel)
+	response.SucessResponse(w, http.StatusCreated, "Channel created successfully", channel)
 }
