@@ -84,4 +84,25 @@ func (s *ChannelServiceImpl) CreateChannel(ctx context.Context, ownerID string, 
 
 func (s *ChannelServiceImpl) GetAllChannels(ctx context.Context,userId string,slug string)([]schemas.Channel,error){
 	
+	workspace, err := s.workspaceRepo.GetSlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("fetch workspace by slug %q: %w", slug, err)
+	}
+
+	is_allowed := false
+	for _,member := range workspace.Members{
+		if member.UserID == userId{
+			is_allowed = true
+		}
+	}
+
+	if !is_allowed{
+		return nil,fmt.Errorf("forbidden: only members can view channels")
+	}
+
+	channels,err := s.repo.GetAllChannels(ctx,workspace.ID,userId)
+	if err!= nil{
+		return nil,err
+	}
+	return channels,nil
 }
