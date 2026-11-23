@@ -6,6 +6,7 @@ import (
 )
 type AppRouters struct {
 	WorkspaceRouter *WorkspaceRouter
+	ChannelRouter *ChannelRouter
 }
 
 func SetupRouter(routers AppRouters) *chi.Mux {
@@ -25,10 +26,14 @@ func SetupRouter(routers AppRouters) *chi.Mux {
 	workSpaceRouter := chi.NewRouter()
 	routers.WorkspaceRouter.Register(workSpaceRouter)
 
+	channelRouter := chi.NewRouter()
+	routers.ChannelRouter.Register(channelRouter)
+	routers.ChannelRouter.Register(workSpaceRouter)
+
 	chiRouter.Mount("/api/v1/workspace", workSpaceRouter)
 	chiRouter.Mount("/workspace", workSpaceRouter)
 	chiRouter.Mount("/", workSpaceRouter)
-
+	chiRouter.Mount("/channel",channelRouter)
 	
 	return chiRouter
 

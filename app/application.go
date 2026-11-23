@@ -38,8 +38,14 @@ func (app *Application) Run() error{
 	wsCntrl := controllers.NewWorkspaceController(wsServ)
 	wsRouter := router.NewWorkspaceRouter(wsCntrl)
 
+	chRepo := repositories.NewChannelRepository(config.Channels)
+	chServ:=services.NewChannelService(chRepo,wsRepo)
+	chCntrl := controllers.NewChannelController(chServ)
+	chRouter:= router.NewChannelRouter(chCntrl)
 
-	chiRouter := router.SetupRouter(router.AppRouters{WorkspaceRouter: wsRouter})
+
+
+	chiRouter := router.SetupRouter(router.AppRouters{WorkspaceRouter: wsRouter,ChannelRouter: chRouter})
 
 	port := app.PORT
 	if(!strings.HasPrefix(port,":")){
