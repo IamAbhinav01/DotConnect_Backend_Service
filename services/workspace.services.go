@@ -19,28 +19,29 @@ type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, ownerId string, dto dto.WorkSpaceCreationDTO) (*schemas.WorkSpace, error)
 	GetUserWorkspace(ctx context.Context, userId string) ([]dto.WorkSpaceResponseDTO, error)
 	GetAllMembers(ctx context.Context, slug string) ([]dto.MemberResponseDTO, error)
-	AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error)
-	PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
-	DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error)
-	CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO) (*schemas.WorkspaceInvite, error)
-	FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error)
-	CreateJoinRequest(ctx context.Context,code string,userId string) error
-	GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error)
-	ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
-	RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string) (string,error)
-	UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error)
-	RemoveMemberFromWorkspace(ctx context.Context,slug string,requesterId string,targetUser dto.RemoveMemberDTO)(bool,error)
-	DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error)
-
-}	
-
-type WorkspaceServiceImpl struct {
-	repo repositories.WorkspaceRepository
+	AddMemberToWorkspace(ctx context.Context, slug string, requsterId string, member dto.AddMemberDTO) (bool, error)
+	PromoteMember(ctx context.Context, slug string, requesterId string, targetUser string) (bool, error)
+	DemoteMember(ctx context.Context, slug string, requesterId string, targetUser string) (bool, error)
+	CreateInvite(ctx context.Context, slug string, requesterId string, dto dto.CreateInviteDTO) (*schemas.WorkspaceInvite, error)
+	FetchInvitation(ctx context.Context, code string, userId string) (*dto.InvitePreviewDTO, error)
+	CreateJoinRequest(ctx context.Context, code string, userId string) error
+	GetAllRequests(ctx context.Context, slug string, requesterId string) ([]schemas.JoinRequest, error)
+	ApproveJoinRequest(ctx context.Context, slug string, requesterId string, requestId string) (string, error)
+	RejectJoinRequest(ctx context.Context, slug string, requesterId string, requestId string) (string, error)
+	UpdateWorkspace(ctx context.Context, slug string, requesterId string, dto dto.WorkSpaceUpdationDTO) (*schemas.WorkSpace, error)
+	RemoveMemberFromWorkspace(ctx context.Context, slug string, requesterId string, targetUser dto.RemoveMemberDTO) (bool, error)
+	DeleteWorkspace(ctx context.Context, slug string, requesterId string) (bool, error)
 }
 
-func NewWorkspaceService(_repo repositories.WorkspaceRepository) *WorkspaceServiceImpl {
+type WorkspaceServiceImpl struct {
+	repo        repositories.WorkspaceRepository
+	channelRepo repositories.ChannelRepository
+}
+
+func NewWorkspaceService(_repo repositories.WorkspaceRepository, _channelRepo repositories.ChannelRepository) *WorkspaceServiceImpl {
 	return &WorkspaceServiceImpl{
-		repo: _repo,
+		repo:        _repo,
+		channelRepo: _channelRepo,
 	}
 }
 
@@ -74,10 +75,10 @@ func (s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context, ownerId stri
 			Slug:        slug,
 			Members: []schemas.WorkspaceMember{
 				{
-					UserID:   ownerId,
+					UserID:    ownerId,
 					AvatarURL: "/api/v1/users/" + ownerId + "/avatar",
-					Role:     constants.ROLE_OWNER,
-					JoinedAt: time.Now(),
+					Role:      constants.ROLE_OWNER,
+					JoinedAt:  time.Now(),
 				},
 			},
 		}
@@ -90,6 +91,26 @@ func (s *WorkspaceServiceImpl) CreateWorkspace(ctx context.Context, ownerId stri
 			}
 			return nil, err
 		}
+
+		isPublic := true
+		_, err = s.channelRepo.CreateChannel(ctx, &schemas.Channel{
+			WorkspaceID: createdWorkspace.ID,
+			Name:        "general",
+			Public:      &isPublic,
+			CreatedBy:   ownerId,
+			Members: []schemas.ChannelMember{
+				{
+					UserID:    ownerId,
+					Role:      constants.ROLE_ADMIN,
+					AvatarURL: "/api/v1/users/" + ownerId + "/avatar",
+					JoinedAt:  time.Now(),
+				},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create default general channel: %w", err)
+		}
+
 		return createdWorkspace, nil
 	}
 }
@@ -117,7 +138,7 @@ func (s *WorkspaceServiceImpl) GetUserWorkspace(ctx context.Context, userId stri
 }
 
 func (s *WorkspaceServiceImpl) GetAllMembers(ctx context.Context, slug string) ([]dto.MemberResponseDTO, error) {
-	
+
 	members, err := s.repo.GetAllMembers(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -126,73 +147,72 @@ func (s *WorkspaceServiceImpl) GetAllMembers(ctx context.Context, slug string) (
 	result := make([]dto.MemberResponseDTO, len(members))
 	for i, member := range members {
 		result[i] = dto.MemberResponseDTO{
-			UserID: member.UserID,
+			UserID:    member.UserID,
 			AvatarURL: member.AvatarURL,
-			Role: member.Role,
-			JoinedAt: member.JoinedAt,
+			Role:      member.Role,
+			JoinedAt:  member.JoinedAt,
 		}
 	}
 
 	return result, nil
 }
 
-func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context,slug string,requsterId string,member dto.AddMemberDTO) (bool,error){
+func (s *WorkspaceServiceImpl) AddMemberToWorkspace(ctx context.Context, slug string, requsterId string, member dto.AddMemberDTO) (bool, error) {
 
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return false,fmt.Errorf("workspace not found")
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("workspace not found")
 	}
 
 	is_authorised := false
-	for _,value := range ws.Members{
-		if(value.UserID == requsterId && constants.Is_Manager(value.Role)){
+	for _, value := range ws.Members {
+		if value.UserID == requsterId && constants.Is_Manager(value.Role) {
 			is_authorised = true
 			break
 		}
 	}
 
-	if(!is_authorised){
-		return false,fmt.Errorf("forbidden: only owners and admins can add members")
+	if !is_authorised {
+		return false, fmt.Errorf("forbidden: only owners and admins can add members")
 	}
 
-	isalreadyMember,err:=s.repo.MemberExists(ctx,slug,member.UserID)
-	if err != nil{
-		return false,err
+	isalreadyMember, err := s.repo.MemberExists(ctx, slug, member.UserID)
+	if err != nil {
+		return false, err
 	}
 
-	if(isalreadyMember){
-		return  false,fmt.Errorf("user is already a member of this workspace")
+	if isalreadyMember {
+		return false, fmt.Errorf("user is already a member of this workspace")
 	}
 
-	memberPayload:=schemas.WorkspaceMember{
-		UserID: member.UserID,
+	memberPayload := schemas.WorkspaceMember{
+		UserID:    member.UserID,
 		AvatarURL: "/api/v1/users/" + member.UserID + "/avatar",
-		Role: member.Role,
-		JoinedAt: time.Now(),
-	}
-	
-	ok,err := s.repo.AddMemberToWorkspace(ctx,slug,memberPayload)
-	if err!= nil{
-		return false,err
+		Role:      member.Role,
+		JoinedAt:  time.Now(),
 	}
 
-	if(!ok){
-		return false,fmt.Errorf("Error occured while adding member to the workspace, check with the db side")
+	ok, err := s.repo.AddMemberToWorkspace(ctx, slug, memberPayload)
+	if err != nil {
+		return false, err
 	}
 
-	return true,nil
+	if !ok {
+		return false, fmt.Errorf("Error occured while adding member to the workspace, check with the db side")
+	}
+
+	return true, nil
 }
 
-func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error){
-
+func (s *WorkspaceServiceImpl) PromoteMember(ctx context.Context, slug string, requesterId string, targetUser string) (bool, error) {
 
 	if requesterId == targetUser {
 		return false, fmt.Errorf("bad request: you cannot promote yourself")
 	}
 
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return false,fmt.Errorf("workspace not found")
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("workspace not found")
 	}
 
 	var requesterMember *schemas.WorkspaceMember
@@ -223,7 +243,7 @@ func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requ
 		return false, fmt.Errorf("bad request: user is already an admin")
 	}
 
-	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,constants.ROLE_ADMIN)
+	ok, err := s.repo.UpdateMemberRole(ctx, slug, targetUser, constants.ROLE_ADMIN)
 	if err != nil {
 		return false, err
 	}
@@ -231,16 +251,15 @@ func(s *WorkspaceServiceImpl) PromoteMember(ctx context.Context,slug string,requ
 
 }
 
-func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,requesterId string,targetUser string)(bool,error){
-
+func (s *WorkspaceServiceImpl) DemoteMember(ctx context.Context, slug string, requesterId string, targetUser string) (bool, error) {
 
 	if requesterId == targetUser {
 		return false, fmt.Errorf("bad request: you cannot demote yourself")
 	}
 
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return false,fmt.Errorf("workspace not found")
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("workspace not found")
 	}
 
 	var requesterMember *schemas.WorkspaceMember
@@ -271,7 +290,7 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 		return false, fmt.Errorf("bad request: user is already a member")
 	}
 
-	ok,err := s.repo.UpdateMemberRole(ctx,slug,targetUser,constants.ROLE_MEMBER)
+	ok, err := s.repo.UpdateMemberRole(ctx, slug, targetUser, constants.ROLE_MEMBER)
 	if err != nil {
 		return false, err
 	}
@@ -279,10 +298,10 @@ func(s *WorkspaceServiceImpl) DemoteMember(ctx context.Context,slug string,reque
 
 }
 
-func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,requesterId string , dto dto.CreateInviteDTO)(*schemas.WorkspaceInvite, error){
+func (s *WorkspaceServiceImpl) CreateInvite(ctx context.Context, slug string, requesterId string, dto dto.CreateInviteDTO) (*schemas.WorkspaceInvite, error) {
 
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
 		return nil, fmt.Errorf("workspace not found")
 	}
 
@@ -293,101 +312,99 @@ func(s *WorkspaceServiceImpl)CreateInvite(ctx context.Context,slug string,reques
 			break
 		}
 	}
-	if (requesterMember == nil) || (requesterMember.Role == "") || (requesterMember.Role == constants.ROLE_MEMBER){
+	if (requesterMember == nil) || (requesterMember.Role == "") || (requesterMember.Role == constants.ROLE_MEMBER) {
 		return nil, fmt.Errorf("forbidden: only owners and admins can create invites")
-	}else{
-		maxJoins:=dto.MaxApprovedJoins
-		if maxJoins <= 0{
-			maxJoins= 5
+	} else {
+		maxJoins := dto.MaxApprovedJoins
+		if maxJoins <= 0 {
+			maxJoins = 5
 		}
 
 		hours := dto.ExpiresInHours
-		if hours <= 0{
+		if hours <= 0 {
 			hours = 24
 		}
 
 		invitation := schemas.WorkspaceInvite{
-			ID: bson.NewObjectID(),
-			Code: generator.GenerateInviteCode(slug),
-			CreatedBy: requesterId,
+			ID:               bson.NewObjectID(),
+			Code:             generator.GenerateInviteCode(slug),
+			CreatedBy:        requesterId,
 			MaxApprovedJoins: maxJoins,
-			ApprovedCount: 0,
-			CreatedAt: time.Now(),
-			ExpiresAt: time.Now().Add(time.Duration(hours)*time.Hour),
+			ApprovedCount:    0,
+			CreatedAt:        time.Now(),
+			ExpiresAt:        time.Now().Add(time.Duration(hours) * time.Hour),
 		}
 
-		err := s.repo.CreateInvite(ctx,slug,invitation)
-		if err != nil{
-			return nil, fmt.Errorf("error occured while creating the invitation : %w",err)
+		err := s.repo.CreateInvite(ctx, slug, invitation)
+		if err != nil {
+			return nil, fmt.Errorf("error occured while creating the invitation : %w", err)
 		}
 
 		return &invitation, nil
 	}
 }
 
-func(s *WorkspaceServiceImpl)FetchInvitation(ctx context.Context,code string,userId string)(*dto.InvitePreviewDTO,error){
+func (s *WorkspaceServiceImpl) FetchInvitation(ctx context.Context, code string, userId string) (*dto.InvitePreviewDTO, error) {
 
-	ws,inv,err:=s.repo.GetInviteByCode(ctx,code)
-	if err != nil{
-		return nil,err
+	ws, inv, err := s.repo.GetInviteByCode(ctx, code)
+	if err != nil {
+		return nil, err
 	}
 
 	isExpired := time.Now().After(inv.ExpiresAt)
 	isExhausted := inv.ApprovedCount >= inv.MaxApprovedJoins
 
 	isAlredyMember := false
-	for _,member:= range ws.Members{
-		if member.UserID == userId{
+	for _, member := range ws.Members {
+		if member.UserID == userId {
 			isAlredyMember = true
 			break
 		}
 	}
 
 	alreadyRequest := "none"
-	for _,req := range ws.JoinRequests{
-		if req.UserID == userId && req.InviteCode == code{
+	for _, req := range ws.JoinRequests {
+		if req.UserID == userId && req.InviteCode == code {
 			alreadyRequest = req.Status
 		}
 	}
 
-
 	return &dto.InvitePreviewDTO{
 		WorkspaceName: ws.Name,
-		Slug: ws.Slug,
-		Description: ws.Description,
-		MemberCount: len(ws.Members),
-		ExpiresAt: inv.ExpiresAt,
-		IsExpired: isExpired,
-		IsExhausted: isExhausted,
+		Slug:          ws.Slug,
+		Description:   ws.Description,
+		MemberCount:   len(ws.Members),
+		ExpiresAt:     inv.ExpiresAt,
+		IsExpired:     isExpired,
+		IsExhausted:   isExhausted,
 		AlreadyMember: isAlredyMember,
 		RequestStatus: alreadyRequest,
-
-	},nil
+	}, nil
 
 }
 
-func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,userId string) error{
+func (s *WorkspaceServiceImpl) CreateJoinRequest(ctx context.Context, code string, userId string) error {
 
-	ws,invite,err := s.repo.GetInviteByCode(ctx,code)
+	ws, invite, err := s.repo.GetInviteByCode(ctx, code)
 
 	slug := ws.Slug
 
-	if time.Now().After( invite.ExpiresAt){
-		return  fmt.Errorf("This invite link has expired")
-	} 
+	if time.Now().After(invite.ExpiresAt) {
+		return fmt.Errorf("This invite link has expired")
+	}
 
-	if invite.ApprovedCount >= invite.MaxApprovedJoins{
+	if invite.ApprovedCount >= invite.MaxApprovedJoins {
 		return fmt.Errorf("this invite has reached its maximum approved join limit")
 	}
 
-	for _,member := range ws.Members{
-		if member.UserID == userId{
+	for _, member := range ws.Members {
+		if member.UserID == userId {
 			return fmt.Errorf("you are already a member of this workspace")
 		}
 	}
-	
-	for _,req := range ws.JoinRequests{
-		if req.Status == "pending" && req.UserID == userId{
+
+	for _, req := range ws.JoinRequests {
+		if req.Status == "pending" && req.UserID == userId {
 			if req.InviteCode == code {
 				return fmt.Errorf("you already have a pending join request for this workspace")
 			}
@@ -401,198 +418,196 @@ func(s *WorkspaceServiceImpl)CreateJoinRequest(ctx context.Context,code string,u
 	}
 
 	joinReq := &schemas.JoinRequest{
-		ID: bson.NewObjectID(),
+		ID:         bson.NewObjectID(),
 		InviteCode: code,
-		UserID: userId,
-		AvatarURL: "/api/v1/users/" + userId + "/avatar",
-		Status: "pending",
-		CreatedAt: time.Now(),
+		UserID:     userId,
+		AvatarURL:  "/api/v1/users/" + userId + "/avatar",
+		Status:     "pending",
+		CreatedAt:  time.Now(),
 	}
 
-
-	err = s.repo.CreateJoinRequest(ctx,slug,joinReq)
-	if err!= nil{
-		return fmt.Errorf("error occured while sending joining to the workspace %w",err)
+	err = s.repo.CreateJoinRequest(ctx, slug, joinReq)
+	if err != nil {
+		return fmt.Errorf("error occured while sending joining to the workspace %w", err)
 	}
 	return nil
 }
 
-func(s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context,slug string,requesterId string) ([] schemas.JoinRequest,error){
-	
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		
-		return nil,fmt.Errorf("Unable to fetch the workspace")
+func (s *WorkspaceServiceImpl) GetAllRequests(ctx context.Context, slug string, requesterId string) ([]schemas.JoinRequest, error) {
+
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+
+		return nil, fmt.Errorf("Unable to fetch the workspace")
 	}
 
-	isAuthorised := false;
-	for _,mem:= range  ws.Members{
-		if mem.UserID == requesterId && constants.Is_Manager(mem.Role){
+	isAuthorised := false
+	for _, mem := range ws.Members {
+		if mem.UserID == requesterId && constants.Is_Manager(mem.Role) {
 			isAuthorised = true
 			break
 		}
 	}
-	if !isAuthorised{
-		
-		return nil,fmt.Errorf("User is not having the required permission to see the list of requests")
-	}
-	
-	requests,err := s.repo.GetJoinRequest(ctx,slug)
-	if err != nil{
-	
-		return nil,fmt.Errorf("Error occured while fetching all the invitations.")
+	if !isAuthorised {
+
+		return nil, fmt.Errorf("User is not having the required permission to see the list of requests")
 	}
 
-	pendingRequests := make([]schemas.JoinRequest,0)
+	requests, err := s.repo.GetJoinRequest(ctx, slug)
+	if err != nil {
 
-	for _,req := range requests{
-		if req.Status == "pending"{
+		return nil, fmt.Errorf("Error occured while fetching all the invitations.")
+	}
+
+	pendingRequests := make([]schemas.JoinRequest, 0)
+
+	for _, req := range requests {
+		if req.Status == "pending" {
 			pendingRequests = append(pendingRequests, req)
 		}
 	}
 
-	return pendingRequests,nil
+	return pendingRequests, nil
 }
 
-func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context,slug string,requesterId string,requestId string)(string,error){
+func (s *WorkspaceServiceImpl) ApproveJoinRequest(ctx context.Context, slug string, requesterId string, requestId string) (string, error) {
 
-	ws,err:=s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return "",fmt.Errorf("No workspace found")
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return "", fmt.Errorf("No workspace found")
 	}
 
 	//userinte permission check cheyanam
-	is_auth:=false
-	for _,member := range ws.Members{
-		if member.UserID == requesterId && constants.Is_Manager(member.Role){
+	is_auth := false
+	for _, member := range ws.Members {
+		if member.UserID == requesterId && constants.Is_Manager(member.Role) {
 			is_auth = true
 			break
 		}
 	}
 
-	if !is_auth{
-		return "",fmt.Errorf("User is not having the permision to approve this user. please ask for admin for approving the request")
+	if !is_auth {
+		return "", fmt.Errorf("User is not having the permision to approve this user. please ask for admin for approving the request")
 	}
 
-	reqId,err := bson.ObjectIDFromHex(requestId)
-	if err!=nil{
-		return "",fmt.Errorf("No request found for this id")
+	reqId, err := bson.ObjectIDFromHex(requestId)
+	if err != nil {
+		return "", fmt.Errorf("No request found for this id")
 	}
 
 	var joinRequest *schemas.JoinRequest
-	for _,req := range ws.JoinRequests{
-		if req.ID == reqId{
+	for _, req := range ws.JoinRequests {
+		if req.ID == reqId {
 			joinRequest = &req
 			break
 		}
 	}
 
-	if joinRequest == nil{
-		return "",fmt.Errorf("No request found")
+	if joinRequest == nil {
+		return "", fmt.Errorf("No request found")
 	}
 
 	if joinRequest.Status != "pending" {
-		return "",fmt.Errorf("the request is already %s",joinRequest.Status)
+		return "", fmt.Errorf("the request is already %s", joinRequest.Status)
 	}
 
 	member := schemas.WorkspaceMember{
-		UserID: joinRequest.UserID,
+		UserID:    joinRequest.UserID,
 		AvatarURL: joinRequest.AvatarURL,
-		Role: constants.ROLE_MEMBER,
-		JoinedAt: time.Now(),
+		Role:      constants.ROLE_MEMBER,
+		JoinedAt:  time.Now(),
 	}
 
-	response,err := s.repo.ApproveRequest(ctx,slug,joinRequest.InviteCode,member,reqId,requestId)
+	response, err := s.repo.ApproveRequest(ctx, slug, joinRequest.InviteCode, member, reqId, requestId)
 	if err != nil {
 		return "", err
 	}
 	return response, nil
 }
 
-func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context,slug string,requesterId string,requestId string)(string,error){
+func (s *WorkspaceServiceImpl) RejectJoinRequest(ctx context.Context, slug string, requesterId string, requestId string) (string, error) {
 
-	ws,err:=s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return "",fmt.Errorf("No workspace found")
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return "", fmt.Errorf("No workspace found")
 	}
 
-	is_auth:=false
-	for _,member := range ws.Members{
-		if member.UserID == requesterId && constants.Is_Manager(member.Role){
+	is_auth := false
+	for _, member := range ws.Members {
+		if member.UserID == requesterId && constants.Is_Manager(member.Role) {
 			is_auth = true
 			break
 		}
 	}
 
-	if !is_auth{
-		return "",fmt.Errorf("User is not having the permission to reject this request")
+	if !is_auth {
+		return "", fmt.Errorf("User is not having the permission to reject this request")
 	}
 
-	reqId,err := bson.ObjectIDFromHex(requestId)
-	if err!=nil{
-		return "",fmt.Errorf("No request found for this id")
+	reqId, err := bson.ObjectIDFromHex(requestId)
+	if err != nil {
+		return "", fmt.Errorf("No request found for this id")
 	}
 
 	var joinRequest *schemas.JoinRequest
-	for _,req := range ws.JoinRequests{
-		if req.ID == reqId{
+	for _, req := range ws.JoinRequests {
+		if req.ID == reqId {
 			joinRequest = &req
 			break
 		}
 	}
 
-	if joinRequest == nil{
-		return "",fmt.Errorf("No request found")
+	if joinRequest == nil {
+		return "", fmt.Errorf("No request found")
 	}
 
 	if joinRequest.Status != "pending" {
-		return "",fmt.Errorf("the request is already %s",joinRequest.Status)
+		return "", fmt.Errorf("the request is already %s", joinRequest.Status)
 	}
 
-	response,err := s.repo.RejectRequest(ctx,slug,joinRequest.InviteCode,reqId,requesterId)
+	response, err := s.repo.RejectRequest(ctx, slug, joinRequest.InviteCode, reqId, requesterId)
 	if err != nil {
 		return "", err
 	}
 	return response, nil
 }
 
-func(s *WorkspaceServiceImpl) UpdateWorkspace(ctx context.Context,slug string,requesterId string,dto dto.WorkSpaceUpdationDTO)(*schemas.WorkSpace,error){
-	
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err != nil{
-		return nil,fmt.Errorf("Error occured , no workspace found %w",err)
+func (s *WorkspaceServiceImpl) UpdateWorkspace(ctx context.Context, slug string, requesterId string, dto dto.WorkSpaceUpdationDTO) (*schemas.WorkSpace, error) {
+
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("Error occured , no workspace found %w", err)
 	}
 
 	is_auth := false
-	for _,member := range ws.Members{
-		if(requesterId == member.UserID && constants.Is_Manager(member.Role)){
+	for _, member := range ws.Members {
+		if requesterId == member.UserID && constants.Is_Manager(member.Role) {
 			is_auth = true
 			break
 		}
 	}
-	if !is_auth{
-		return nil,fmt.Errorf("forbidden: only owners and admins can update this workspace")
+	if !is_auth {
+		return nil, fmt.Errorf("forbidden: only owners and admins can update this workspace")
 	}
 
 	name := strings.TrimSpace(dto.Name)
 	description := dto.Description
-	
+
 	modifiedws := &schemas.WorkSpace{}
-	
-	if name != ""{
+
+	if name != "" {
 		modifiedws.Name = name
 	}
-	if description != ""{
+	if description != "" {
 		modifiedws.Description = description
 	}
 
-	
-	updatedWorkspace,err:=s.repo.UpdateWorkspace(ctx,slug,modifiedws)
-	if err!=nil{
-		return nil,fmt.Errorf("Error occured while updating the workspace")
+	updatedWorkspace, err := s.repo.UpdateWorkspace(ctx, slug, modifiedws)
+	if err != nil {
+		return nil, fmt.Errorf("Error occured while updating the workspace")
 	}
 
-	return updatedWorkspace,nil
+	return updatedWorkspace, nil
 }
 
 func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, slug string, requesterId string, targetUser dto.RemoveMemberDTO) (bool, error) {
@@ -601,8 +616,8 @@ func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, sl
 		return false, fmt.Errorf("error fetching workspace: %w", err)
 	}
 
-	memberPayload:=schemas.WorkspaceMember{
-		UserID: targetUser.UserID,
+	memberPayload := schemas.WorkspaceMember{
+		UserID:   targetUser.UserID,
 		JoinedAt: time.Now(),
 	}
 
@@ -641,7 +656,7 @@ func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, sl
 		if !ok {
 			return false, fmt.Errorf("unable to leave workspace")
 		}
-		return true, nil 
+		return true, nil
 	}
 
 	// Rule 3: Case B — Kicking someone else (requesterId != targetUserId)
@@ -667,34 +682,34 @@ func (s *WorkspaceServiceImpl) RemoveMemberFromWorkspace(ctx context.Context, sl
 	return true, nil
 }
 
-func (s *WorkspaceServiceImpl) DeleteWorkspace(ctx context.Context,slug string , requesterId string)(bool,error){
-	ws,err := s.repo.GetSlug(ctx,slug)
-	if err!= nil{
-		return false,fmt.Errorf("Error occured while fetching the workspace %w",err)
+func (s *WorkspaceServiceImpl) DeleteWorkspace(ctx context.Context, slug string, requesterId string) (bool, error) {
+	ws, err := s.repo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("Error occured while fetching the workspace %w", err)
 	}
 
 	is_auth := false
 
-	for _,member:= range ws.Members{
-		if member.UserID == requesterId && member.Role == constants.ROLE_OWNER{
+	for _, member := range ws.Members {
+		if member.UserID == requesterId && member.Role == constants.ROLE_OWNER {
 			is_auth = true
 			break
 		}
 	}
 
-	if !is_auth{
-		return false,fmt.Errorf("forbidden: only owners can delete workspace")
+	if !is_auth {
+		return false, fmt.Errorf("forbidden: only owners can delete workspace")
 	}
 
-	ok,err := s.repo.DeleteWorkspace(ctx,slug)
-	if err!= nil{
-		return false,fmt.Errorf("Error occured while removing the workspaace %w",err)
+	ok, err := s.repo.DeleteWorkspace(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("Error occured while removing the workspaace %w", err)
 	}
 
-	if(!ok){
-		return false,err
+	if !ok {
+		return false, err
 	}
 
-	return true,nil
+	return true, nil
 
 }
