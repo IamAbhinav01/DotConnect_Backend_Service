@@ -18,6 +18,7 @@ type ChannelRepository interface {
 	GetAllChannels(ctx context.Context,workspaceId bson.ObjectID,userID string)([]schemas.Channel,error)
 	GetChannel(ctx context.Context,workspaceId bson.ObjectID,channelId bson.ObjectID)(*schemas.Channel,error)
 	JoinChannel(ctx context.Context,workspaceId bson.ObjectID,channelID bson.ObjectID, member schemas.ChannelMember)(bool,error)
+	
 }
 
 type ChannelRepositoryImpl struct{
