@@ -18,6 +18,7 @@ type ChannelService interface {
 	GetAllChannels(ctx context.Context, userId string, slug string) ([]schemas.Channel, error)
 	FetchChannel(ctx context.Context, userID string, slug string, channelIDStr string) (*schemas.Channel, error)
 	JoinChannel(ctx context.Context,userID string,slug string,channelIDStr string)(bool,error)
+	AddMemberToChannel(ctx context.Context,userID string,slug string,channelIDStr string)(bool,error)
 }
 
 type ChannelServiceImpl struct {
@@ -199,4 +200,73 @@ func(s *ChannelServiceImpl) JoinChannel(ctx context.Context,userID string,slug s
 		return false,fmt.Errorf("Operation failed while joining %w",err)
 	}
 	return true,nil
+}
+
+func(s *ChannelServiceImpl)AddMemberToChannel(ctx context.Context,requestUserID string,targetUserID string,slug string,channelIDStr string)(bool,error){
+
+	workspace, err := s.workspaceRepo.GetSlug(ctx, slug)
+	if err != nil {
+		return false, fmt.Errorf("fetch workspace by slug %q : %w", slug, err)
+	}
+
+	isRequestedMember:=false
+	isTargetedMember:=false
+	isRequesterManager := false
+
+	for _,member:=range workspace.Members{
+		if member.UserID == requestUserID {
+			isRequestedMember = true
+			isRequesterManager = constants.Is_Manager(member.Role)
+		}
+		if member.UserID == targetUserID {
+			isTargetedMember = true
+		}
+	}
+
+	if !isRequestedMember {
+		return false, fmt.Errorf("forbidden: requester is not a member of this workspace")
+	}
+	if !isTargetedMember {
+		return false, fmt.Errorf("bad request: target user is not a member of this workspace")
+	}
+
+	channelID, err := bson.ObjectIDFromHex(channelIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid channel id %q", channelIDStr)
+	}
+
+	channel, err := s.repo.GetChannel(ctx, workspace.ID, channelID)
+	if err != nil {
+		return false, fmt.Errorf("channel not found: %w", err)
+	}
+
+	isRequesterInChannel := false
+	for _, m := range channel.Members {
+		if m.UserID == requestUserID {
+			isRequesterInChannel = true
+			break
+		}
+	}
+
+	if !isRequesterManager && !isRequesterInChannel {
+		return false, fmt.Errorf("forbidden: you must be a member of this channel to add others")
+	}
+
+
+
+	newMember := schemas.ChannelMember{
+		UserID: targetUserID,
+		Role: constants.ROLE_MEMBER,
+		AvatarURL: "/api/v1/users/" + targetUserID + "/avatar",
+		JoinedAt: time.Now(),
+	}
+
+	ok, err := s.repo.AddMember(ctx, workspace.ID, channelID, newMember)
+	if err != nil {
+		return false, fmt.Errorf("error adding member to channel: %w", err) 
+	}
+	if !ok {
+		return false, fmt.Errorf("operation failed while adding member")
+	}
+	return true, nil
 }
