@@ -18,7 +18,7 @@ type ChannelRepository interface {
 	GetAllChannels(ctx context.Context,workspaceId bson.ObjectID,userID string)([]schemas.Channel,error)
 	GetChannel(ctx context.Context,workspaceId bson.ObjectID,channelId bson.ObjectID)(*schemas.Channel,error)
 	JoinChannel(ctx context.Context,workspaceId bson.ObjectID,channelID bson.ObjectID, member schemas.ChannelMember)(bool,error)
-	
+	AddMember(ctx context.Context,workspaceId bson.ObjectID,channelId bson.ObjectID,member schemas.ChannelMember)(bool,error)
 }
 
 type ChannelRepositoryImpl struct{
@@ -129,4 +129,33 @@ func(repo *ChannelRepositoryImpl)JoinChannel(ctx context.Context,workspaceId bso
 
 	return true,nil
 
+}
+
+func(repo *ChannelRepositoryImpl)AddMember(ctx context.Context,workspaceId bson.ObjectID,channelId bson.ObjectID,member schemas.ChannelMember)(bool,error){
+
+	filter:=bson.M{
+		"_id":            channelId,
+		"workspaceId":    workspaceId,
+		"members.userId": bson.M{"$ne": member.UserID},
+	}
+
+	update:=bson.M{
+		"$push": bson.M{
+        "members": member, 
+		},
+		"$set": bson.M{
+			"updatedAt": time.Now(),
+		},
+	}
+
+	result,err:=repo.db.UpdateOne(ctx,filter,update)
+	if err != nil{
+		return false,fmt.Errorf("error adding the member: %w",err)
+	}
+
+	if result.MatchedCount == 0{
+		return false,fmt.Errorf("channel not found , or you are already a member")
+	}
+
+	return true,nil
 }
